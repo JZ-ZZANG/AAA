@@ -1,7 +1,7 @@
 {
   "name": "aaa-asset-administration-assistant",
   "productName": "AAA",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Asset Administration Assistant",
   "license": "GPL-3.0-or-later",
   "private": true,
