@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, net, protocol, session, shell, webContents } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, net, protocol, shell } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
 const { fileURLToPath, pathToFileURL } = require("node:url");
@@ -10,12 +10,6 @@ const { runAiCensorship } = require("./ai-censorship.cjs");
 const { withStagedFileDeletion } = require("./safe-delete.cjs");
 const { originAssetRoot, cleanedAssetRoot } = require("./project-paths.cjs");
 const { createZip, readArchive, safeArchiveName } = require("./project-archive.cjs");
-const {
-  EXPORT_AUTOMATION_TIMEOUT_MS,
-  EXPORT_BROWSER_PARTITION,
-  consumeRequestBudget,
-  createRequestBudget
-} = require("./export-security.cjs");
 const crypto = require("node:crypto");
 const sharp = require("sharp");
 let electronAutoUpdater = null;
@@ -37,10 +31,7 @@ let activeAiCensorshipController = null;
 const approvedCloseWindows = new WeakSet();
 const gifPreviewPaths = new Map();
 const animationPreviewFiles = new Map();
-const exportFileBatches = new Map();
-const protectedExportGuests = new Map();
 const MAX_GIF_PREVIEW_PATHS = 200;
-const EXPORT_FILE_BATCH_TTL_MS = 20 * 60 * 1000;
 let updateState = { status: "checking", currentVersion: app.getVersion(), latestVersion: "", percent: 0, message: "" };
 let updateInstallRequested = false;
 
@@ -80,92 +71,6 @@ function configureAutoUpdate() {
   setTimeout(() => electronAutoUpdater.checkForUpdates().catch((error) => publishUpdateState({ status: "error", message: error.message })), 1500);
 }
 
-function exportGuestState(contentsOrId) {
-  const id = typeof contentsOrId === "number" ? contentsOrId : contentsOrId?.id;
-  return protectedExportGuests.get(Number(id));
-}
-
-function notifyExportSecurity(state, reason, message) {
-  if (!state || state.notifiedReasons.has(reason)) return;
-  state.notifiedReasons.add(reason);
-  const owner = webContents.fromId(state.ownerWebContentsId);
-  if (owner && !owner.isDestroyed()) owner.send("export-security:violation", { reason, message });
-}
-
-function clearExportGuestProtection(guestId) {
-  const state = protectedExportGuests.get(Number(guestId));
-  if (!state) return false;
-  clearTimeout(state.timeout);
-  clearTimeout(state.unresponsiveTimeout);
-  protectedExportGuests.delete(Number(guestId));
-  return true;
-}
-
-function resetProtectedExportGuest(guest, reason, message) {
-  const state = exportGuestState(guest);
-  if (!state || !guest || guest.isDestroyed()) return false;
-  notifyExportSecurity(state, reason, message);
-  clearExportGuestProtection(guest.id);
-  try { guest.forcefullyCrashRenderer(); } catch {}
-  setTimeout(() => {
-    if (!guest.isDestroyed()) {
-      try { guest.reload(); } catch {}
-    }
-  }, 0);
-  return true;
-}
-
-function configureExportGuest(contents) {
-  if (contents.getType() !== "webview" || contents.session !== session.fromPartition(EXPORT_BROWSER_PARTITION)) return;
-  contents.setWindowOpenHandler(() => {
-    const state = exportGuestState(contents);
-    if (!state) return { action: "allow" };
-    notifyExportSecurity(state, "popup", "자동 입력 중 새 창 열기를 차단했습니다.");
-    return { action: "deny" };
-  });
-  contents.on("unresponsive", () => {
-    const state = exportGuestState(contents);
-    if (!state || state.unresponsiveTimeout) return;
-    state.unresponsiveTimeout = setTimeout(() => {
-      resetProtectedExportGuest(contents, "unresponsive", "자동 입력 코드가 브라우저를 응답 불능 상태로 만들어 안전하게 중단했습니다.");
-    }, 5000);
-  });
-  contents.on("responsive", () => {
-    const state = exportGuestState(contents);
-    if (!state) return;
-    clearTimeout(state.unresponsiveTimeout);
-    state.unresponsiveTimeout = null;
-  });
-  contents.once("destroyed", () => clearExportGuestProtection(contents.id));
-}
-
-function configureExportSessionSecurity() {
-  const exportSession = session.fromPartition(EXPORT_BROWSER_PARTITION);
-  exportSession.setPermissionCheckHandler(() => false);
-  exportSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
-  exportSession.webRequest.onBeforeRequest((details, callback) => {
-    const directState = exportGuestState(details.webContentsId);
-    const state = directState || (protectedExportGuests.size === 1 ? protectedExportGuests.values().next().value : null);
-    if (!state) { callback({}); return; }
-    if (state.requestsBlocked) { callback({ cancel: true }); return; }
-    const result = consumeRequestBudget(state.requestBudget);
-    if (result.allowed) { callback({}); return; }
-    state.requestsBlocked = true;
-    const message = result.reason === "rate"
-      ? "자동 입력이 짧은 시간에 너무 많은 요청을 보내 이후 요청을 차단했습니다."
-      : "자동 입력의 전체 요청 한도를 초과해 이후 요청을 차단했습니다.";
-    notifyExportSecurity(state, `request-${result.reason}`, message);
-    callback({ cancel: true });
-  });
-  exportSession.on("will-download", (event, _item, contents) => {
-    const state = exportGuestState(contents) || (protectedExportGuests.size === 1 ? protectedExportGuests.values().next().value : null);
-    if (!state) return;
-    event.preventDefault();
-    notifyExportSecurity(state, "download", "자동 입력 중 파일 다운로드를 차단했습니다.");
-  });
-  app.on("web-contents-created", (_event, contents) => configureExportGuest(contents));
-}
-
 function responseWithCors(body, options = {}) {
   const headers = new Headers(options.headers || {});
   headers.set("Access-Control-Allow-Origin", "*");
@@ -200,19 +105,10 @@ async function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
-      nodeIntegration: false,
-      webviewTag: true
+      nodeIntegration: false
     }
   });
   window.__aaaApplicationLoaded = false;
-  window.webContents.on("will-attach-webview", (_event, webPreferences) => {
-    delete webPreferences.preload;
-    webPreferences.nodeIntegration = false;
-    webPreferences.contextIsolation = true;
-    webPreferences.sandbox = true;
-    webPreferences.webSecurity = true;
-    webPreferences.allowRunningInsecureContent = false;
-  });
   window.on("maximize", () => window.webContents.send("window:maximized-changed", true));
   window.on("unmaximize", () => window.webContents.send("window:maximized-changed", false));
   window.on("close", (event) => {
@@ -552,13 +448,12 @@ function normalizeGlobalBackup(payload) {
   if (root.format !== GLOBAL_BACKUP_FORMAT || root.formatVersion !== GLOBAL_BACKUP_VERSION) throw new Error("지원하지 않는 AAA 설정 백업 파일입니다.");
   const rawData = backupObject(root.data, "백업 데이터");
   const validTypes = new Set(["prompt", "situation", "lorebook"]);
-  const validFolderTypes = new Set([...validTypes, "export"]);
   const folderKeys = new Set();
   const templateFolders = backupArray(rawData.templateFolders, "템플릿 폴더", 5000).map((raw, index) => {
     const item = backupObject(raw, `템플릿 폴더 ${index + 1}`);
     const id = backupString(item.id, `템플릿 폴더 ${index + 1} ID`, 200, false);
     const type = backupString(item.type, `템플릿 폴더 ${index + 1} 종류`, 20, false);
-    if (!validFolderTypes.has(type)) throw new Error(`템플릿 폴더 ${index + 1} 종류가 올바르지 않습니다.`);
+    if (!validTypes.has(type)) throw new Error(`템플릿 폴더 ${index + 1} 종류가 올바르지 않습니다.`);
     const key = `${type}:${id}`;
     if (folderKeys.has(key)) throw new Error("백업 파일에 중복된 템플릿 폴더가 있습니다.");
     folderKeys.add(key);
@@ -576,36 +471,16 @@ function normalizeGlobalBackup(payload) {
       content: backupString(item.content, `템플릿 ${index + 1} 내용`, 4 * 1024 * 1024)
     };
   });
-  const exportTemplates = backupArray(rawData.exportTemplates, "내보내기 템플릿", 1000).map((raw, index) => {
-    const item = backupObject(raw, `내보내기 템플릿 ${index + 1}`);
-    return {
-      name: backupString(item.name, `내보내기 템플릿 ${index + 1} 이름`, 500, false),
-      folderId: backupString(item.folderId || "", `내보내기 템플릿 ${index + 1} 폴더 ID`, 200),
-      targetOrigin: backupString(item.targetOrigin || "", `내보내기 템플릿 ${index + 1} 사이트 주소`, 2048),
-      allowedOrigins: backupArray(item.allowedOrigins, `내보내기 템플릿 ${index + 1} 허용 주소`, 1000).map((origin, originIndex) => backupString(origin, `내보내기 템플릿 ${index + 1} 허용 주소 ${originIndex + 1}`, 2048)),
-      mappings: backupJsonValue(backupArray(item.mappings, `내보내기 템플릿 ${index + 1} 매핑`, 5000), `내보내기 템플릿 ${index + 1} 매핑`, 2 * 1024 * 1024),
-      script: backupString(item.script, `내보내기 템플릿 ${index + 1} 코드`, 4 * 1024 * 1024)
-    };
-  });
-  const exportBookmarks = backupArray(rawData.exportBookmarks, "내보내기 즐겨찾기", 5000).map((raw, index) => {
-    const item = backupObject(raw, `내보내기 즐겨찾기 ${index + 1}`);
-    return {
-      name: backupString(item.name, `내보내기 즐겨찾기 ${index + 1} 이름`, 500, false),
-      url: backupString(item.url, `내보내기 즐겨찾기 ${index + 1} 주소`, 2048)
-    };
-  });
   return {
     preferences: backupJsonValue(backupObject(root.preferences, "전역 설정"), "전역 설정", 1024 * 1024),
-    data: { templates, templateFolders, exportTemplates, exportBookmarks }
+    data: { templates, templateFolders }
   };
 }
 
 function globalBackupSummary(data) {
   return {
     templates: data.templates.length,
-    templateFolders: data.templateFolders.length,
-    exportTemplates: data.exportTemplates.length,
-    exportBookmarks: data.exportBookmarks.length
+    templateFolders: data.templateFolders.length
   };
 }
 
@@ -995,113 +870,6 @@ function registerIpc() {
   ipcMain.handle("lorebook-template-folders:rename", (_event, id, name) => store.renameTemplateFolder(requiredText(id, "폴더 ID"), "lorebook", requiredText(name, "폴더 이름")));
   ipcMain.handle("lorebook-template-folders:delete", (_event, id) => store.deleteTemplateFolder(requiredText(id, "폴더 ID"), "lorebook"));
   ipcMain.handle("lorebook-template-folders:move", (_event, id, folderId) => store.moveTemplateToFolder(requiredText(id, "로어북 템플릿 ID"), "lorebook", typeof folderId === "string" ? folderId : ""));
-  ipcMain.handle("export-templates:list", () => store.listExportTemplates());
-  ipcMain.handle("export-templates:create", (_event, source) => store.createExportTemplate(source && typeof source === "object" ? source : {}));
-  ipcMain.handle("export-templates:save", (_event, input) => {
-    const saved = store.saveExportTemplate({ id: requiredText(input?.id, "내보내기 템플릿 ID"), name: requiredText(input?.name, "템플릿 이름"), targetOrigin: typeof input?.targetOrigin === "string" ? input.targetOrigin : "", allowedOrigins: Array.isArray(input?.allowedOrigins) ? input.allowedOrigins : [], script: typeof input?.script === "string" ? input.script : "" });
-    if (!saved) throw new Error("수정할 수 없는 내보내기 템플릿입니다.");
-    return saved;
-  });
-  ipcMain.handle("export-templates:delete", (_event, id) => store.deleteExportTemplate(requiredText(id, "내보내기 템플릿 ID")));
-  ipcMain.handle("export-templates:reorder", (_event, ids) => store.reorderExportTemplates(Array.isArray(ids) ? ids.map((id) => requiredText(id, "내보내기 템플릿 ID")) : []));
-  ipcMain.handle("export-template-folders:list", () => store.listExportTemplateFolders());
-  ipcMain.handle("export-template-folders:create", (_event, name) => store.createExportTemplateFolder(requiredText(name, "폴더 이름")));
-  ipcMain.handle("export-template-folders:rename", (_event, id, name) => store.renameExportTemplateFolder(requiredText(id, "폴더 ID"), requiredText(name, "폴더 이름")));
-  ipcMain.handle("export-template-folders:delete", (_event, id) => store.deleteExportTemplateFolder(requiredText(id, "폴더 ID")));
-  ipcMain.handle("export-template-folders:move", (_event, id, folderId) => store.moveExportTemplateToFolder(requiredText(id, "내보내기 템플릿 ID"), typeof folderId === "string" ? folderId : ""));
-  ipcMain.handle("export-bookmarks:list", () => store.listExportBookmarks());
-  ipcMain.handle("export-bookmarks:create", () => store.createExportBookmark());
-  ipcMain.handle("export-bookmarks:save", (_event, input) => {
-    const rawUrl = requiredText(input?.url, "즐겨찾기 주소");
-    const url = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`;
-    try {
-      const parsed = new URL(url);
-      if (!["http:", "https:"].includes(parsed.protocol)) throw new Error();
-    } catch { throw new Error("즐겨찾기 주소는 http:// 또는 https://로 시작해야 합니다."); }
-    const saved = store.saveExportBookmark({ id: requiredText(input?.id, "즐겨찾기 ID"), name: requiredText(input?.name, "즐겨찾기 이름"), url });
-    if (!saved) throw new Error("즐겨찾기를 찾을 수 없습니다.");
-    return saved;
-  });
-  ipcMain.handle("export-bookmarks:delete", (_event, id) => store.deleteExportBookmark(requiredText(id, "즐겨찾기 ID")));
-  ipcMain.handle("export-security:start", (event, input) => {
-    const guest = webContents.fromId(Number(input?.webContentsId));
-    if (!guest || guest.isDestroyed() || guest.getType() !== "webview" || guest.hostWebContents?.id !== event.sender.id) throw new Error("보호할 플랫폼 브라우저를 찾을 수 없습니다.");
-    let currentUrl;
-    try { currentUrl = new URL(guest.getURL()); } catch {}
-    if (!currentUrl || !["http:", "https:"].includes(currentUrl.protocol)) throw new Error("HTTPS 또는 HTTP 사이트에서만 자동 입력을 실행할 수 있습니다.");
-    clearExportGuestProtection(guest.id);
-    const state = {
-      ownerWebContentsId: event.sender.id,
-      requestBudget: createRequestBudget(input),
-      requestsBlocked: false,
-      notifiedReasons: new Set(),
-      timeout: null,
-      unresponsiveTimeout: null
-    };
-    state.timeout = setTimeout(() => {
-      resetProtectedExportGuest(guest, "timeout", "자동 입력의 최대 실행 시간을 초과해 안전하게 중단했습니다.");
-    }, EXPORT_AUTOMATION_TIMEOUT_MS);
-    protectedExportGuests.set(guest.id, state);
-    return { origin, requestLimit: state.requestBudget.total, perSecondLimit: state.requestBudget.perSecond };
-  });
-  ipcMain.handle("export-security:stop", (event, input) => {
-    const guestId = Number(input?.webContentsId);
-    const state = exportGuestState(guestId);
-    if (state?.ownerWebContentsId !== event.sender.id) return false;
-    return clearExportGuestProtection(guestId);
-  });
-  ipcMain.handle("export-security:finish", (event, input) => {
-    const state = exportGuestState(Number(input?.webContentsId));
-    if (state?.ownerWebContentsId !== event.sender.id) return false;
-    clearTimeout(state.timeout);
-    state.timeout = null;
-    return true;
-  });
-  ipcMain.handle("export-files:register", async (_event, input) => {
-    const files = Array.isArray(input) ? input : [];
-    const filesToUpload = [];
-    for (const item of files) {
-      const imagePath = path.resolve(requiredText(item?.path, "업로드 이미지 경로"));
-      const stats = await statsOrNull(imagePath);
-      if (!stats?.isFile() || !IMAGE_EXTENSIONS.has(path.extname(imagePath).toLowerCase())) throw new Error("업로드할 이미지 파일을 찾을 수 없습니다.");
-      const extension = path.extname(imagePath).toLowerCase();
-      const requestedName = String(item?.name || path.basename(imagePath, extension)).trim().replace(/[<>:"/\\|?*\x00-\x1f]+/g, "_");
-      const name = `${requestedName || path.basename(imagePath, extension)}${requestedName.toLowerCase().endsWith(extension) ? "" : extension}`;
-      filesToUpload.push({ path: imagePath, name });
-    }
-    if (!filesToUpload.length) return "";
-    const token = crypto.randomUUID();
-    exportFileBatches.set(token, { files: filesToUpload, createdAt: Date.now() });
-    return token;
-  });
-  ipcMain.handle("export-files:discard", (_event, input) => {
-    for (const token of Array.isArray(input) ? input : []) exportFileBatches.delete(String(token || ""));
-    return true;
-  });
-  ipcMain.handle("export-files:set-input", async (_event, input) => {
-    const token = requiredText(input?.token, "이미지 업로드 토큰");
-    const batch = exportFileBatches.get(token);
-    if (!batch) throw new Error("이미지 업로드 정보가 만료되었습니다. 내보내기를 다시 실행해 주세요.");
-    if (Date.now() - batch.createdAt > EXPORT_FILE_BATCH_TTL_MS) {
-      exportFileBatches.delete(token);
-      throw new Error("이미지 업로드 정보가 만료되었습니다. 내보내기를 다시 실행해 주세요.");
-    }
-    const guest = webContents.fromId(Number(input?.webContentsId));
-    if (!guest || guest.isDestroyed()) throw new Error("플랫폼 브라우저를 찾을 수 없습니다.");
-    const selector = typeof input?.selector === "string" && input.selector ? input.selector : 'input[type="file"][multiple]';
-    const guestDebugger = guest.debugger;
-    let attachedHere = false;
-    try {
-      if (!guestDebugger.isAttached()) { guestDebugger.attach("1.3"); attachedHere = true; }
-      const evaluation = await guestDebugger.sendCommand("Runtime.evaluate", { expression: `document.querySelector(${JSON.stringify(selector)})`, returnByValue: false });
-      if (!evaluation.result?.objectId) throw new Error("이미지 파일 입력란을 찾을 수 없습니다.");
-      await guestDebugger.sendCommand("DOM.setFileInputFiles", { files: batch.files.map((entry) => entry.path), objectId: evaluation.result.objectId });
-      exportFileBatches.delete(token);
-      return batch.files.length;
-    } finally {
-      if (attachedHere && guestDebugger.isAttached()) guestDebugger.detach();
-    }
-  });
   ipcMain.handle("lorebooks:list", (_event, projectId) => store.listLorebooks(requiredText(projectId, "프로젝트 ID")));
   ipcMain.handle("lorebooks:get", (_event, id) => store.getLorebook(requiredText(id, "로어북 ID")));
   ipcMain.handle("lorebooks:create", (_event, projectId) => store.createLorebook(requiredText(projectId, "프로젝트 ID")));
@@ -1353,7 +1121,6 @@ app.whenReady().then(async () => {
   await new Promise((resolve) => setTimeout(resolve, 0));
   const databasePath = path.join(app.getPath("userData"), "aaa.sqlite");
   store = new Store(databasePath);
-  configureExportSessionSecurity();
   protocol.handle("aaa-asset", async (request) => {
     const url = new URL(request.url);
     if (url.hostname === "local") {
@@ -1406,5 +1173,4 @@ app.on("before-quit", () => {
     try { fs.unlinkSync(preview.filePath); } catch {}
   }
   animationPreviewFiles.clear();
-  exportFileBatches.clear();
 });

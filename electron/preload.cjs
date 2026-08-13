@@ -115,39 +115,6 @@ contextBridge.exposeInMainWorld("aaa", {
     deleteFolder: (_scopeId, id) => ipcRenderer.invoke("lorebook-template-folders:delete", id),
     moveToFolder: (_scopeId, id, folderId) => ipcRenderer.invoke("lorebook-template-folders:move", id, folderId)
   },
-  exportTemplates: {
-    list: () => ipcRenderer.invoke("export-templates:list"),
-    create: (source) => ipcRenderer.invoke("export-templates:create", source),
-    save: (input) => ipcRenderer.invoke("export-templates:save", input),
-    delete: (id) => ipcRenderer.invoke("export-templates:delete", id),
-    reorder: (ids) => ipcRenderer.invoke("export-templates:reorder", ids),
-    listFolders: () => ipcRenderer.invoke("export-template-folders:list"),
-    createFolder: (name) => ipcRenderer.invoke("export-template-folders:create", name),
-    renameFolder: (id, name) => ipcRenderer.invoke("export-template-folders:rename", id, name),
-    deleteFolder: (id) => ipcRenderer.invoke("export-template-folders:delete", id),
-    moveToFolder: (id, folderId) => ipcRenderer.invoke("export-template-folders:move", id, folderId)
-  },
-  exportBookmarks: {
-    list: () => ipcRenderer.invoke("export-bookmarks:list"),
-    create: () => ipcRenderer.invoke("export-bookmarks:create"),
-    save: (input) => ipcRenderer.invoke("export-bookmarks:save", input),
-    delete: (id) => ipcRenderer.invoke("export-bookmarks:delete", id)
-  },
-  exportSecurity: {
-    start: (input) => ipcRenderer.invoke("export-security:start", input),
-    finish: (input) => ipcRenderer.invoke("export-security:finish", input),
-    stop: (input) => ipcRenderer.invoke("export-security:stop", input),
-    onViolation: (callback) => {
-      const listener = (_event, detail) => callback(detail);
-      ipcRenderer.on("export-security:violation", listener);
-      return () => ipcRenderer.removeListener("export-security:violation", listener);
-    }
-  },
-  exportFiles: {
-    register: (files) => ipcRenderer.invoke("export-files:register", files),
-    setInput: (input) => ipcRenderer.invoke("export-files:set-input", input),
-    discard: (tokens) => ipcRenderer.invoke("export-files:discard", tokens)
-  },
   lorebooks: {
     list: (projectId) => ipcRenderer.invoke("lorebooks:list", projectId),
     get: (id) => ipcRenderer.invoke("lorebooks:get", id),

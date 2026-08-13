@@ -97,27 +97,6 @@ class Store {
         created_at TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS project_entry_folders_project_type_position ON project_entry_folders(project_id, type, position ASC, created_at ASC);
-      CREATE TABLE IF NOT EXISTS export_templates (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        folder_id TEXT NOT NULL DEFAULT '',
-        site_url TEXT NOT NULL DEFAULT '',
-        built_in INTEGER NOT NULL DEFAULT 0,
-        mappings TEXT NOT NULL DEFAULT '[]',
-        script TEXT NOT NULL DEFAULT '',
-        allowed_origins TEXT NOT NULL DEFAULT '[]',
-        position INTEGER NOT NULL DEFAULT 0,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      );
-      CREATE TABLE IF NOT EXISTS export_bookmarks (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        url TEXT NOT NULL,
-        position INTEGER NOT NULL DEFAULT 0,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      );
       CREATE TABLE IF NOT EXISTS lorebooks (
         id TEXT PRIMARY KEY,
         project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -175,27 +154,6 @@ class Store {
     const templateColumns = this.db.prepare("PRAGMA table_info(templates)").all();
     if (!templateColumns.some((column) => column.name === "group_name")) this.db.exec("ALTER TABLE templates ADD COLUMN group_name TEXT NOT NULL DEFAULT ''");
     if (!templateColumns.some((column) => column.name === "folder_id")) this.db.exec("ALTER TABLE templates ADD COLUMN folder_id TEXT NOT NULL DEFAULT ''");
-    const exportTemplateColumns = this.db.prepare("PRAGMA table_info(export_templates)").all();
-    if (!exportTemplateColumns.some((column) => column.name === "folder_id")) this.db.exec("ALTER TABLE export_templates ADD COLUMN folder_id TEXT NOT NULL DEFAULT ''");
-    if (!exportTemplateColumns.some((column) => column.name === "script")) this.db.exec("ALTER TABLE export_templates ADD COLUMN script TEXT NOT NULL DEFAULT ''");
-    const hadAllowedOrigins = exportTemplateColumns.some((column) => column.name === "allowed_origins");
-    if (!hadAllowedOrigins) this.db.exec("ALTER TABLE export_templates ADD COLUMN allowed_origins TEXT NOT NULL DEFAULT '[]'");
-    if (!exportTemplateColumns.some((column) => column.name === "position")) {
-      this.db.exec("ALTER TABLE export_templates ADD COLUMN position INTEGER NOT NULL DEFAULT 0");
-      const legacyTemplates = this.db.prepare("SELECT id FROM export_templates ORDER BY built_in DESC, name ASC, created_at ASC").all();
-      const updatePosition = this.db.prepare("UPDATE export_templates SET position = ? WHERE id = ?");
-      legacyTemplates.forEach(({ id }, position) => updatePosition.run(position, id));
-    }
-    this.db.exec("CREATE INDEX IF NOT EXISTS export_templates_position ON export_templates(position ASC, created_at ASC)");
-    const legacyExportUrls = hadAllowedOrigins ? [] : this.db.prepare("SELECT name, site_url AS url FROM export_templates WHERE site_url <> '' ORDER BY created_at ASC").all();
-    const findBookmarkUrl = this.db.prepare("SELECT id FROM export_bookmarks WHERE url = ?");
-    const insertBookmark = this.db.prepare("INSERT INTO export_bookmarks (id, name, url, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)");
-    legacyExportUrls.forEach(({ name, url }) => {
-      if (findBookmarkUrl.get(url)) return;
-      const now = new Date().toISOString();
-      const position = Number(this.db.prepare("SELECT COALESCE(MAX(position), -1) + 1 AS position FROM export_bookmarks").get().position);
-      insertBookmark.run(crypto.randomUUID(), name, url, position, now, now);
-    });
     const legacyGroups = this.db.prepare("SELECT DISTINCT group_name AS name FROM templates WHERE type = 'lorebook' AND group_name <> '' AND folder_id = ''").all();
     legacyGroups.forEach(({ name }) => {
       let folder = this.db.prepare("SELECT id FROM template_folders WHERE type = 'lorebook' AND name = ?").get(name);
@@ -393,73 +351,6 @@ class Store {
     return this.db.prepare("SELECT t.id, t.type, t.title, t.folder_id AS folderId, f.name AS folderName, t.keywords, t.content, t.position, t.created_at AS createdAt, t.updated_at AS updatedAt FROM templates t LEFT JOIN template_folders f ON f.id = t.folder_id WHERE t.type = ? ORDER BY t.position ASC, t.created_at ASC").all(type).map((entry) => ({ ...entry, folderId: entry.folderId || "", folderName: entry.folderName || "", projectId: "global-templates", position: Number(entry.position), keywords: parseLorebookKeywords(entry.keywords) }));
   }
 
-  listExportTemplates() {
-    return this.db.prepare("SELECT e.id, e.name, e.folder_id AS folderId, f.name AS folderName, e.site_url AS targetOrigin, e.allowed_origins AS allowedOrigins, e.built_in AS builtIn, e.mappings, e.script, e.position, e.created_at AS createdAt, e.updated_at AS updatedAt FROM export_templates e LEFT JOIN template_folders f ON f.id = e.folder_id AND f.type = 'export' ORDER BY e.position ASC, e.created_at ASC").all().map((entry) => {
-      let mappings = [];
-      let allowedOrigins = [];
-      try { mappings = JSON.parse(entry.mappings || "[]"); } catch {}
-      try { allowedOrigins = JSON.parse(entry.allowedOrigins || "[]"); } catch {}
-      return { ...entry, folderId: entry.folderId || "", folderName: entry.folderName || "", targetOrigin: entry.targetOrigin || "", allowedOrigins: Array.isArray(allowedOrigins) ? allowedOrigins : [], builtIn: Boolean(entry.builtIn), mappings: Array.isArray(mappings) ? mappings : [], position: Number(entry.position) };
-    });
-  }
-
-  createExportTemplate(source = {}) {
-    const id = crypto.randomUUID();
-    const now = new Date().toISOString();
-    const name = String(source.name || "새 내보내기 템플릿").trim() || "새 내보내기 템플릿";
-    const position = Number(this.db.prepare("SELECT COALESCE(MAX(position), -1) + 1 AS position FROM export_templates").get().position);
-    const folderId = source.folderId && this.db.prepare("SELECT id FROM template_folders WHERE id = ? AND type = 'export'").get(source.folderId) ? source.folderId : "";
-    this.db.prepare("INSERT INTO export_templates (id, name, folder_id, site_url, built_in, mappings, script, allowed_origins, position, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)")
-      .run(id, name, folderId, String(source.targetOrigin || ""), JSON.stringify(Array.isArray(source.mappings) ? source.mappings : []), String(source.script || ""), JSON.stringify(Array.isArray(source.allowedOrigins) ? source.allowedOrigins : []), position, now, now);
-    return this.listExportTemplates().find((entry) => entry.id === id);
-  }
-
-  saveExportTemplate({ id, name, targetOrigin = "", allowedOrigins = [], script = "" }) {
-    const current = this.listExportTemplates().find((entry) => entry.id === id);
-    if (!current || current.builtIn) return null;
-    this.db.prepare("UPDATE export_templates SET name = ?, site_url = ?, allowed_origins = ?, script = ?, updated_at = ? WHERE id = ? AND built_in = 0")
-      .run(name, targetOrigin, JSON.stringify(allowedOrigins), script, new Date().toISOString(), id);
-    return this.listExportTemplates().find((entry) => entry.id === id) || null;
-  }
-
-  deleteExportTemplate(id) {
-    this.db.prepare("DELETE FROM export_templates WHERE id = ? AND built_in = 0").run(id);
-    return true;
-  }
-
-  reorderExportTemplates(ids) {
-    const update = this.db.prepare("UPDATE export_templates SET position = ? WHERE id = ?");
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      ids.forEach((id, position) => update.run(position, id));
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
-    return this.listExportTemplates();
-  }
-
-  listExportTemplateFolders() { return this.listTemplateFolders("export"); }
-  createExportTemplateFolder(name) { return this.createTemplateFolder("export", name); }
-  renameExportTemplateFolder(id, name) { return this.renameTemplateFolder(id, "export", name); }
-
-  deleteExportTemplateFolder(id) {
-    this.db.prepare("UPDATE export_templates SET folder_id = '' WHERE folder_id = ?").run(id);
-    this.db.prepare("DELETE FROM template_folders WHERE id = ? AND type = 'export'").run(id);
-    return true;
-  }
-
-  moveExportTemplateToFolder(id, folderId) {
-    if (folderId && !this.db.prepare("SELECT id FROM template_folders WHERE id = ? AND type = 'export'").get(folderId)) throw new Error("폴더를 찾을 수 없습니다.");
-    this.db.prepare("UPDATE export_templates SET folder_id = ? WHERE id = ?").run(folderId, id);
-    return this.listExportTemplates().find((entry) => entry.id === id) || null;
-  }
-
-  listExportBookmarks() {
-    return this.db.prepare("SELECT id, name, url, position, created_at AS createdAt, updated_at AS updatedAt FROM export_bookmarks ORDER BY position ASC, created_at ASC").all().map((entry) => ({ ...entry, position: Number(entry.position) }));
-  }
-
   getGlobalBackupData() {
     const templateTypes = ["prompt", "situation", "lorebook"];
     const templates = templateTypes.flatMap((type) => this.listTemplates(type).map((entry) => ({
@@ -471,40 +362,22 @@ class Store {
       content: entry.content,
       position: entry.position
     })));
-    const templateFolders = [...templateTypes, "export"].flatMap((type) => this.listTemplateFolders(type).map((folder) => ({
+    const templateFolders = templateTypes.flatMap((type) => this.listTemplateFolders(type).map((folder) => ({
       id: folder.id,
       type: folder.type,
       name: folder.name,
       position: folder.position
     })));
-    const exportTemplates = this.listExportTemplates().filter((entry) => !entry.builtIn).map((entry) => ({
-      name: entry.name,
-      folderId: entry.folderId,
-      targetOrigin: entry.targetOrigin,
-      allowedOrigins: entry.allowedOrigins,
-      mappings: entry.mappings,
-      script: entry.script,
-      position: entry.position
-    }));
-    const exportBookmarks = this.listExportBookmarks().map((entry) => ({
-      name: entry.name,
-      url: entry.url,
-      position: entry.position
-    }));
-    return { templates, templateFolders, exportTemplates, exportBookmarks };
+    return { templates, templateFolders };
   }
 
   appendGlobalBackupData(data) {
     const now = new Date().toISOString();
     const folderIds = new Map();
-    const folderPositions = new Map(["prompt", "situation", "lorebook", "export"].map((type) => [type, Number(this.db.prepare("SELECT COALESCE(MAX(position), -1) AS position FROM template_folders WHERE type = ?").get(type).position) + 1]));
+    const folderPositions = new Map(["prompt", "situation", "lorebook"].map((type) => [type, Number(this.db.prepare("SELECT COALESCE(MAX(position), -1) AS position FROM template_folders WHERE type = ?").get(type).position) + 1]));
     const templatePositions = new Map(["prompt", "situation", "lorebook"].map((type) => [type, Number(this.db.prepare("SELECT COALESCE(MAX(position), -1) AS position FROM templates WHERE type = ?").get(type).position) + 1]));
-    let exportTemplatePosition = Number(this.db.prepare("SELECT COALESCE(MAX(position), -1) AS position FROM export_templates").get().position) + 1;
-    let bookmarkPosition = Number(this.db.prepare("SELECT COALESCE(MAX(position), -1) AS position FROM export_bookmarks").get().position) + 1;
     const insertFolder = this.db.prepare("INSERT INTO template_folders (id, type, name, position, created_at) VALUES (?, ?, ?, ?, ?)");
     const insertTemplate = this.db.prepare("INSERT INTO templates (id, type, title, group_name, folder_id, keywords, content, position, created_at, updated_at) VALUES (?, ?, ?, '', ?, ?, ?, ?, ?, ?)");
-    const insertExportTemplate = this.db.prepare("INSERT INTO export_templates (id, name, folder_id, site_url, built_in, mappings, script, allowed_origins, position, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)");
-    const insertBookmark = this.db.prepare("INSERT INTO export_bookmarks (id, name, url, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)");
 
     this.db.exec("BEGIN IMMEDIATE");
     try {
@@ -519,15 +392,6 @@ class Store {
         insertTemplate.run(crypto.randomUUID(), entry.type, entry.title, folderId, JSON.stringify(entry.keywords), entry.content, templatePositions.get(entry.type), now, now);
         templatePositions.set(entry.type, templatePositions.get(entry.type) + 1);
       }
-      for (const entry of data.exportTemplates) {
-        const folderId = entry.folderId ? folderIds.get(`export:${entry.folderId}`) || "" : "";
-        insertExportTemplate.run(crypto.randomUUID(), entry.name, folderId, entry.targetOrigin, JSON.stringify(entry.mappings), entry.script, JSON.stringify(entry.allowedOrigins), exportTemplatePosition, now, now);
-        exportTemplatePosition += 1;
-      }
-      for (const entry of data.exportBookmarks) {
-        insertBookmark.run(crypto.randomUUID(), entry.name, entry.url, bookmarkPosition, now, now);
-        bookmarkPosition += 1;
-      }
       this.db.exec("COMMIT");
     } catch (error) {
       this.db.exec("ROLLBACK");
@@ -535,28 +399,8 @@ class Store {
     }
     return {
       templates: data.templates.length,
-      templateFolders: data.templateFolders.length,
-      exportTemplates: data.exportTemplates.length,
-      exportBookmarks: data.exportBookmarks.length
+      templateFolders: data.templateFolders.length
     };
-  }
-
-  createExportBookmark() {
-    const id = crypto.randomUUID();
-    const now = new Date().toISOString();
-    const position = Number(this.db.prepare("SELECT COALESCE(MAX(position), -1) + 1 AS position FROM export_bookmarks").get().position);
-    this.db.prepare("INSERT INTO export_bookmarks (id, name, url, position, created_at, updated_at) VALUES (?, '새 즐겨찾기', '', ?, ?, ?)").run(id, position, now, now);
-    return this.listExportBookmarks().find((entry) => entry.id === id);
-  }
-
-  saveExportBookmark({ id, name, url }) {
-    this.db.prepare("UPDATE export_bookmarks SET name = ?, url = ?, updated_at = ? WHERE id = ?").run(name, url, new Date().toISOString(), id);
-    return this.listExportBookmarks().find((entry) => entry.id === id) || null;
-  }
-
-  deleteExportBookmark(id) {
-    this.db.prepare("DELETE FROM export_bookmarks WHERE id = ?").run(id);
-    return true;
   }
 
   getTemplate(id, type) {

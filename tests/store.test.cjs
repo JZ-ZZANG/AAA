@@ -199,33 +199,3 @@ test("빈 타이틀 슬롯을 유지하고 이미지 정보만 비울 수 있다
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
-
-test("사용자 내보내기 코드 템플릿을 저장한다", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "aaa-export-templates-"));
-  let store;
-  try {
-    store = new Store(path.join(root, "test.sqlite"));
-    const created = store.createExportTemplate();
-    const second = store.createExportTemplate({ name: "두 번째 플랫폼" });
-    store.reorderExportTemplates([second.id, created.id]);
-    assert.deepEqual(store.listExportTemplates().map((entry) => entry.id), [second.id, created.id]);
-    const script = 'setValue("#description", work.introduction)';
-    const saved = store.saveExportTemplate({ id: created.id, name: "테스트 플랫폼", targetOrigin: "https://example.com", allowedOrigins: ["https://upload.example.com"], script });
-    assert.equal(saved.name, "테스트 플랫폼");
-    assert.equal(saved.targetOrigin, "https://example.com");
-    assert.deepEqual(saved.allowedOrigins, ["https://upload.example.com"]);
-    assert.equal(saved.script, script);
-    const bookmark = store.createExportBookmark();
-    const savedBookmark = store.saveExportBookmark({ id: bookmark.id, name: "제작 페이지", url: "https://example.com/register" });
-    assert.equal(savedBookmark.name, "제작 페이지");
-    assert.equal(store.listExportBookmarks()[0].url, "https://example.com/register");
-    store.deleteExportBookmark(bookmark.id);
-    assert.equal(store.listExportBookmarks().length, 0);
-    store.deleteExportTemplate(second.id);
-    store.deleteExportTemplate(created.id);
-    assert.equal(store.listExportTemplates().length, 0);
-  } finally {
-    store?.close();
-    fs.rmSync(root, { recursive: true, force: true });
-  }
-});
