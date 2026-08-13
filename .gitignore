@@ -1,0 +1,28 @@
+
+/legacy
+/docs
+/templates
+
+/node_modules
+/dist
+/release
+
+# 로컬 데이터베이스
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite-journal
+
+# 환경 및 로그
+.env
+.env.*
+!.env.example
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 운영체제 및 편집기
+.DS_Store
+Thumbs.db
+.idea/

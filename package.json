@@ -1,0 +1,72 @@
+{
+  "name": "aaa-asset-administration-assistant",
+  "productName": "AAA",
+  "version": "0.1.0",
+  "description": "Asset Administration Assistant",
+  "license": "GPL-3.0-or-later",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "concurrently -k \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "build": "vite build",
+    "test": "node --test tests/*.test.cjs",
+    "dist": "npm run build && electron-builder --win nsis",
+    "release": "npm run build && electron-builder --win nsis --publish always"
+  },
+  "dependencies": {
+    "lucide-react": "^1.29.0",
+    "react": "latest",
+    "react-dom": "latest",
+    "electron-updater": "^6.8.9",
+    "sharp": "^0.34.3"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "latest",
+    "concurrently": "latest",
+    "electron": "latest",
+    "electron-builder": "^26.15.3",
+    "vite": "latest",
+    "wait-on": "latest"
+  },
+  "build": {
+    "appId": "com.jzzzang.aaa",
+    "productName": "AAA",
+    "artifactName": "AAA-Setup-${version}-${arch}.${ext}",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "icon": "build/AAA_icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowElevation": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "AAA",
+      "deleteAppDataOnUninstall": false
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "JZ-ZZANG",
+        "repo": "AAA",
+        "releaseType": "draft"
+      }
+    ]
+  }
+}
