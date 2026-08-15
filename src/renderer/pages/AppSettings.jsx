@@ -150,7 +150,7 @@ function AppSettings({ preferences, onChange, onBack, updateState, onCheckUpdate
     try {
       const status = await window.aaa.aiRuntime.check();
       setAiRuntime({ ...status, loading: false });
-      setAiRuntimeMessage(status.updateAvailable ? `AI 검열 기능 ${status.latestVersion} 버전을 설치할 수 있습니다.` : "최신 AI 검열 기능입니다.");
+      setAiRuntimeMessage(status.updateAvailable ? "업데이트가 있습니다" : "최신 버전입니다");
     } catch (error) { setAiRuntimeMessage(error.message); }
     finally { setAiRuntimeBusy(false); }
   };
