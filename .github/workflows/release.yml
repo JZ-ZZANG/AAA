@@ -46,7 +46,7 @@ jobs:
 
           gh release view $tag *> $null
           if ($LASTEXITCODE -ne 0) {
-            gh release create $tag --draft --generate-notes --title "AAA $tag" --verify-tag
+            gh release create $tag --draft --title "AAA $tag" --notes "" --verify-tag
           }
 
           gh release upload $tag $assets --clobber

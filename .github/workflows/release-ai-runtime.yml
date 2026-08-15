@@ -46,7 +46,7 @@ jobs:
             "ai-release/runtime.json" `
             --draft `
             --latest=false `
-            --generate-notes `
+            --notes "" `
             --title "AAA AI Runtime $env:GITHUB_REF_NAME"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
