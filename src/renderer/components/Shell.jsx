@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Circle, Copy, Eraser, Home as HomeIcon, LayoutGrid, Minus, Paintbrush, RectangleHorizontal, RectangleVertical, RotateCcw, Settings as SettingsIcon, Square, Trash2, X } from "lucide-react";
-import { EXTENSIONS, ORIGINAL_EXTENSION, TRACKED_EXTENSIONS } from "../shared.js";
+import { EXTENSIONS, ORIGINAL_EXTENSION, TRACKED_EXTENSIONS, shortcutFromEvent, wheelShortcutFromEvent } from "../shared.js";
 
 function ShortcutInput({ value, onChange, allowWheel = false }) {
   return <input readOnly value={value} onKeyDown={(event) => { event.preventDefault(); const shortcut = shortcutFromEvent(event); if (shortcut) onChange(shortcut); }} onWheel={allowWheel ? (event) => { event.preventDefault(); onChange(wheelShortcutFromEvent(event)); } : undefined} />;

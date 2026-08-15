@@ -20,8 +20,28 @@ contextBridge.exposeInMainWorld("aaa", {
       return () => ipcRenderer.removeListener("updates:state-changed", listener);
     }
   },
+  aiRuntime: {
+    status: () => ipcRenderer.invoke("ai-runtime:status"),
+    check: () => ipcRenderer.invoke("ai-runtime:check"),
+    consumeInstallRequest: () => ipcRenderer.invoke("ai-runtime:consume-install-request"),
+    install: () => ipcRenderer.invoke("ai-runtime:install"),
+    installFromFile: () => ipcRenderer.invoke("ai-runtime:install-from-file"),
+    cancelInstall: () => ipcRenderer.invoke("ai-runtime:cancel-install"),
+    remove: () => ipcRenderer.invoke("ai-runtime:remove"),
+    openFolder: () => ipcRenderer.invoke("ai-runtime:open-folder"),
+    onProgress: (callback) => {
+      const listener = (_event, progress) => callback(progress);
+      ipcRenderer.on("ai-runtime:progress", listener);
+      return () => ipcRenderer.removeListener("ai-runtime:progress", listener);
+    }
+  },
   markdown: {
     imageDataUrl: (source, basePath) => ipcRenderer.invoke("markdown:image-data-url", source, basePath)
+  },
+  stickers: {
+    list: () => ipcRenderer.invoke("stickers:list"),
+    add: () => ipcRenderer.invoke("stickers:add"),
+    delete: (id) => ipcRenderer.invoke("stickers:delete", id)
   },
   gifs: {
     chooseImages: () => ipcRenderer.invoke("gifs:choose-images"),
@@ -132,6 +152,7 @@ contextBridge.exposeInMainWorld("aaa", {
   assets: {
     list: (projectId) => ipcRenderer.invoke("assets:list", projectId),
     aiCensor: (input) => ipcRenderer.invoke("assets:ai-censor", input),
+    aiLogs: () => ipcRenderer.invoke("assets:ai-logs"),
     cancelAi: () => ipcRenderer.invoke("assets:cancel-ai"),
     onAiProgress: (callback) => {
       const listener = (_event, progress) => callback(progress);
@@ -142,7 +163,7 @@ contextBridge.exposeInMainWorld("aaa", {
     syncExternal: (projectId, targetExtension) => ipcRenderer.invoke("assets:sync-external", projectId, targetExtension),
     forget: (assetId) => ipcRenderer.invoke("assets:forget", assetId),
     delete: (assetId) => ipcRenderer.invoke("assets:delete", assetId),
-    setReview: (assetId, status) => ipcRenderer.invoke("assets:set-review", assetId, status),
+    setReview: (assetId, status, options) => ipcRenderer.invoke("assets:set-review", assetId, status, options),
     saveCensored: (assetId, dataUrl) => ipcRenderer.invoke("assets:save-censored", assetId, dataUrl),
     dataUrl: (assetId, original = false) => ipcRenderer.invoke("assets:data-url", assetId, original),
     url: (assetId, original = false) => ipcRenderer.invoke("assets:url", assetId, original),

@@ -1,0 +1,9 @@
+{
+  "runtimeVersion": "1.0.0",
+  "protocolVersion": 1,
+  "pythonVersion": "3.11",
+  "torchVersion": "2.13.0+cpu",
+  "torchvisionVersion": "0.28.0+cpu",
+  "ultralyticsVersion": "8.4.120",
+  "entry": "aaa-ai-worker.exe"
+}

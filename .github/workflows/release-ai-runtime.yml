@@ -1,0 +1,51 @@
+name: Build AI Runtime release
+
+on:
+  push:
+    tags:
+      - "ai-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release-ai-runtime:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: ai-runtime/requirements.txt
+
+      - name: Verify runtime tag
+        run: node scripts/verify-ai-runtime-tag.cjs
+
+      - name: Install AI build dependencies
+        run: python -m pip install -r ai-runtime/requirements.txt
+
+      - name: Build AI Runtime package
+        run: npm run dist:ai
+
+      - name: Publish AI Runtime pre-release
+        shell: pwsh
+        run: |
+          $runtimeVersion = (Get-Content ai-runtime/runtime.json | ConvertFrom-Json).runtimeVersion
+          gh release create $env:GITHUB_REF_NAME `
+            "ai-release/AAA-AI-Runtime-$runtimeVersion.zip" `
+            "ai-release/AAA-AI-Runtime-$runtimeVersion.sha256" `
+            "ai-release/runtime.json" `
+            --prerelease `
+            --generate-notes `
+            --title "AAA AI Runtime $env:GITHUB_REF_NAME"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

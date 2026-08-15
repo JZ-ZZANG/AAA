@@ -11,7 +11,33 @@ import { ExportProject } from "./Export.jsx";
 
 function ProjectPage({ project, onBack, onProjectChanged, classificationLayout, onClassificationLayoutChange, suspended = false }) {
   const [tab, setTab] = useState("settings");
-  useEffect(() => { const shortcuts = savedShortcuts(); const listener = (event) => { if (suspended || ["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName)) return; if (matchesShortcut(event, shortcuts.home)) { event.preventDefault(); onBack(); } else if (matchesShortcut(event, shortcuts.management)) { event.preventDefault(); setTab("settings"); } else if (matchesShortcut(event, shortcuts.classification)) { event.preventDefault(); setTab("classification"); } else if (project.censorshipConfig.enabled && matchesShortcut(event, shortcuts.censorship)) { event.preventDefault(); setTab("censorship"); } }; window.addEventListener("keydown", listener); return () => window.removeEventListener("keydown", listener); }, [project.censorshipConfig.enabled, onBack, suspended]);
+  useEffect(() => {
+    const shortcuts = savedShortcuts();
+    const tabShortcuts = [
+      ["management", "settings"],
+      ["work", "work"],
+      ["prompts", "prompts"],
+      ["lorebook", "lorebook"],
+      ["situation", "situation"],
+      ["classification", "classification"],
+      ["censorship", "censorship"],
+      ["export", "export"]
+    ];
+    const listener = (event) => {
+      if (suspended || ["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName)) return;
+      if (matchesShortcut(event, shortcuts.home)) {
+        event.preventDefault();
+        onBack();
+        return;
+      }
+      const match = tabShortcuts.find(([key]) => matchesShortcut(event, shortcuts[key]));
+      if (!match) return;
+      event.preventDefault();
+      if (match[1] !== "censorship" || project.censorshipConfig.enabled) setTab(match[1]);
+    };
+    window.addEventListener("keydown", listener);
+    return () => window.removeEventListener("keydown", listener);
+  }, [project.censorshipConfig.enabled, onBack, suspended]);
   let content = <Settings project={project} onSaved={onProjectChanged} />;
   if (tab === "work") content = <Work project={project} />;
   else if (tab === "classification") content = <Classification project={project} refreshVersion={0} layout={classificationLayout} onLayoutChange={onClassificationLayoutChange} />;

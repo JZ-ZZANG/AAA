@@ -151,8 +151,15 @@ function runProcess(command, args, onMessage, signal) {
   });
 }
 
-async function runWorker(jobPath, onMessage, signal) {
-  const script = path.join(__dirname, "ai-censorship-worker.py");
+async function runWorker(jobPath, onMessage, signal, workerPath = "") {
+  if (workerPath) {
+    let workerStats;
+    try { workerStats = await fs.promises.stat(workerPath); }
+    catch (error) { if (error.code === "ENOENT") throw new Error("패키지에 포함된 AI 실행 파일을 찾을 수 없습니다."); throw error; }
+    if (!workerStats.isFile()) throw new Error("패키지에 포함된 AI 실행 파일이 올바르지 않습니다.");
+    return runProcess(workerPath, [jobPath], onMessage, signal);
+  }
+  const script = path.join(__dirname, "..", "ai-runtime", "worker.py");
   try { return await runProcess("py", ["-3", script, jobPath], onMessage, signal); }
   catch (error) {
     if (error.code !== "ENOENT") throw error;
@@ -164,8 +171,11 @@ async function runWorker(jobPath, onMessage, signal) {
   }
 }
 
-async function runAiCensorship({ project, assets, settings, onProgress, onResult, signal }) {
+async function runAiCensorship({ project, assets, settings, onProgress, onResult, signal, workerPath = "" }) {
   throwIfCancelled(signal);
+  const allowedTargets = new Set(["nipple", "vulva", "anus", "penis", "testicles", "x_ray", "cross_section"]);
+  const targets = [...new Set(Array.isArray(settings.targets) ? settings.targets.filter((target) => allowedTargets.has(target)) : [])];
+  if (!targets.length) throw new Error("검열 대상을 하나 이상 선택해 주세요.");
   const modelPath = path.resolve(String(settings.modelPath || ""));
   let modelStats;
   try { modelStats = await fs.promises.stat(modelPath); }
@@ -174,7 +184,7 @@ async function runAiCensorship({ project, assets, settings, onProgress, onResult
   const jobPath = path.join(os.tmpdir(), `aaa-ai-censorship-${process.pid}-${Date.now()}.json`);
   const results = new Map();
   const total = assets.length;
-  await fs.promises.writeFile(jobPath, JSON.stringify({ modelPath, targets: settings.targets, confidence: Number(settings.confidence) / 100, imageSize: settings.imageSize, files: assets.map((asset) => ({ path: asset.savedPath })) }), "utf8");
+  await fs.promises.writeFile(jobPath, JSON.stringify({ modelPath, targets, confidence: Number(settings.confidence) / 100, imageSize: settings.imageSize, files: assets.map((asset) => ({ path: asset.savedPath })) }), "utf8");
   try {
     onProgress({ stage: "loading", completed: 0, total, message: "AI 모델 불러오는 중" });
     await runWorker(jobPath, (message) => {
@@ -183,7 +193,7 @@ async function runAiCensorship({ project, assets, settings, onProgress, onResult
         results.set(message.index, message);
         onProgress({ stage: "detecting", completed: results.size, total, message: `이미지 분석 중 (${results.size}/${total})` });
       }
-    }, signal);
+    }, signal, workerPath);
     let succeeded = 0;
     let failed = 0;
     for (let index = 0; index < assets.length; index += 1) {
@@ -195,10 +205,10 @@ async function runAiCensorship({ project, assets, settings, onProgress, onResult
         const outputPath = outputPathFor(project, asset);
         await renderCensoredAsset(asset.savedPath, outputPath, result.detections, settings);
         throwIfCancelled(signal);
-        await onResult(asset, "auto", outputPath);
+        await onResult(asset, "auto", outputPath, "", result.detections.length);
         succeeded += 1;
       } catch (error) {
-        await onResult(asset, "failed");
+        await onResult(asset, "failed", undefined, error.message);
         failed += 1;
       }
       onProgress({ stage: "saving", completed: index + 1, total, message: `검열 이미지 저장 중 (${index + 1}/${total})` });

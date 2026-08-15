@@ -187,7 +187,12 @@ function Prompts({ project, kind = "prompt", api = null }) {
 
   function scheduleAutoSave() {
     clearTimeout(autoSaveTimer.current);
-    autoSaveTimer.current = setTimeout(() => saveDraft(), 700);
+    autoSaveTimer.current = setTimeout(async () => {
+      const savingDraft = draftRef.current;
+      const saved = await saveDraft(savingDraft);
+      const currentDraft = draftRef.current;
+      if (saved && currentDraft?.id === savingDraft?.id && currentDraft.title === savingDraft.title && currentDraft.content === savingDraft.content) setStatus("자동 저장됨");
+    }, 700);
   }
 
   function updateDraft(changes) {

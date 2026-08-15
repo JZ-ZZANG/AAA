@@ -7,6 +7,16 @@
 /dist
 /release
 
+# Python / PyInstaller 빌드 산출물
+__pycache__/
+*.py[cod]
+.pytest_cache/
+/.venv/
+/venv/
+/python-build/
+/python-dist/
+/ai-release/
+
 # 로컬 데이터베이스
 *.sqlite
 *.sqlite-shm

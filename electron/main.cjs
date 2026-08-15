@@ -10,6 +10,8 @@ const { runAiCensorship } = require("./ai-censorship.cjs");
 const { withStagedFileDeletion } = require("./safe-delete.cjs");
 const { originAssetRoot, cleanedAssetRoot } = require("./project-paths.cjs");
 const { createZip, readArchive, safeArchiveName } = require("./project-archive.cjs");
+const { addStickers, deleteSticker, listStickers, stickerPath } = require("./stickers.cjs");
+const { AiRuntimeManager } = require("./ai-runtime.cjs");
 const crypto = require("node:crypto");
 const sharp = require("sharp");
 let electronAutoUpdater = null;
@@ -25,14 +27,28 @@ protocol.registerSchemesAsPrivileged([
 const STARTUP_LOADING_PAGE = `data:text/html;charset=UTF-8,${encodeURIComponent(`<!doctype html><html><head><meta charset="utf-8"><meta name="color-scheme" content="light dark"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><style>*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0}body{display:grid;place-items:center;background:#f5f5f3}.startup-loader{position:relative;width:220px;height:4px;overflow:hidden;border-radius:999px;background:#deded9}.startup-loader::after{content:"";position:absolute;inset:0;width:42%;border-radius:inherit;background:#555;animation:loading 1.05s ease-in-out infinite}@keyframes loading{0%{transform:translateX(-110%)}100%{transform:translateX(350%)}}@media(prefers-color-scheme:dark){body{background:#1d1d1b}.startup-loader{background:#343432}.startup-loader::after{background:#aaa}}@media(prefers-reduced-motion:reduce){.startup-loader::after{animation-duration:1.8s}}</style></head><body><div class="startup-loader" role="progressbar" aria-label="불러오는 중"></div></body></html>`)}`;
 
 let store;
+let aiRuntime;
 const censoredSaveQueues = new Map();
 let activeAiCensorshipPromise = null;
 let activeAiCensorshipController = null;
+const aiCensorshipLogs = [];
+const MAX_AI_CENSORSHIP_LOGS = 500;
 const approvedCloseWindows = new WeakSet();
 const gifPreviewPaths = new Map();
 const animationPreviewFiles = new Map();
 const MAX_GIF_PREVIEW_PATHS = 200;
 let updateState = { status: "checking", currentVersion: app.getVersion(), latestVersion: "", percent: 0, message: "" };
+
+function appendAiCensorshipLog(level, message) {
+  aiCensorshipLogs.push({ id: crypto.randomUUID(), timestamp: new Date().toISOString(), level, message });
+  if (aiCensorshipLogs.length > MAX_AI_CENSORSHIP_LOGS) aiCensorshipLogs.splice(0, aiCensorshipLogs.length - MAX_AI_CENSORSHIP_LOGS);
+}
+
+function publishAiRuntimeProgress(progress) {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) window.webContents.send("ai-runtime:progress", progress);
+  }
+}
 let updateInstallRequested = false;
 
 function publishUpdateState(changes = {}) {
@@ -142,6 +158,24 @@ function requiredText(value, label) {
 async function statsOrNull(targetPath) {
   try { return await fs.promises.stat(targetPath); }
   catch (error) { if (error.code === "ENOENT") return null; throw error; }
+}
+
+function stickerRoot() {
+  return path.join(app.getPath("userData"), "stickers");
+}
+
+function twemojiSvgPath(idValue) {
+  const id = typeof idValue === "string" ? idValue.toLowerCase() : "";
+  if (!/^[0-9a-f]+(?:-[0-9a-f]+)*$/.test(id)) throw new Error("Twemoji ID가 올바르지 않습니다.");
+  const staticRoot = app.isPackaged ? path.join(__dirname, "..", "dist") : path.join(__dirname, "..", "public");
+  return path.join(staticRoot, "vendor", "twemoji", "assets", "svg", `${id}.svg`);
+}
+
+async function stickerListWithUrls() {
+  return (await listStickers(stickerRoot())).map((sticker) => ({
+    ...sticker,
+    url: `aaa-asset://local/sticker/${encodeURIComponent(sticker.id)}?v=${sticker.modifiedAt}`
+  }));
 }
 
 function animationDefaultFileName(format, createdAt = new Date()) {
@@ -532,7 +566,10 @@ function uniqueProjectArchiveName(projectName, usedNames) {
 
 function registerIpc() {
   ipcMain.handle("shell:open-external", (_event, url) => {
-    const allowedUrls = new Set(["https://github.com/JZ-ZZANG/AAA"]);
+    const allowedUrls = new Set([
+      "https://github.com/JZ-ZZANG/AAA",
+      "https://discord.gg/hq4fvU5UGx"
+    ]);
     if (!allowedUrls.has(url)) throw new Error("허용되지 않은 외부 주소입니다.");
     return shell.openExternal(url);
   });
@@ -628,6 +665,46 @@ function registerIpc() {
   ipcMain.handle("dialog:choose-model", async () => {
     const result = await dialog.showOpenDialog({ properties: ["openFile"], filters: [{ name: "PyTorch 모델", extensions: ["pt"] }] });
     return result.canceled ? null : result.filePaths[0];
+  });
+  ipcMain.handle("ai-runtime:status", () => aiRuntime.installed());
+  ipcMain.handle("ai-runtime:check", () => aiRuntime.latest());
+  ipcMain.handle("ai-runtime:consume-install-request", () => aiRuntime.consumeInstallRequest());
+  ipcMain.handle("ai-runtime:install", () => aiRuntime.installLatest(publishAiRuntimeProgress));
+  ipcMain.handle("ai-runtime:install-from-file", async (event) => {
+    const result = await dialog.showOpenDialog(BrowserWindow.fromWebContents(event.sender), {
+      title: "AI 검열 기능 파일 선택",
+      properties: ["openFile"],
+      filters: [{ name: "AAA AI Runtime", extensions: ["zip"] }]
+    });
+    if (result.canceled || !result.filePaths[0]) return { canceled: true, ...(await aiRuntime.installed()) };
+    const installed = await aiRuntime.installArchive(result.filePaths[0], publishAiRuntimeProgress);
+    return { canceled: false, ...installed };
+  });
+  ipcMain.handle("ai-runtime:cancel-install", () => { aiRuntime.cancelInstall(); return true; });
+  ipcMain.handle("ai-runtime:remove", async () => {
+    if (activeAiCensorshipPromise) throw new Error("AI 검열 작업 중에는 실행 환경을 삭제할 수 없습니다.");
+    return aiRuntime.remove();
+  });
+  ipcMain.handle("ai-runtime:open-folder", async () => {
+    await fs.promises.mkdir(aiRuntime.rootPath, { recursive: true });
+    const error = await shell.openPath(aiRuntime.rootPath);
+    if (error) throw new Error(error);
+    return true;
+  });
+  ipcMain.handle("stickers:list", () => stickerListWithUrls());
+  ipcMain.handle("stickers:add", async (event) => {
+    const result = await dialog.showOpenDialog(BrowserWindow.fromWebContents(event.sender), {
+      title: "스티커 이미지 추가",
+      properties: ["openFile", "multiSelections"],
+      filters: [{ name: "스티커 이미지", extensions: ["png", "jpg", "jpeg", "webp", "avif", "gif", "bmp", "svg"] }]
+    });
+    if (result.canceled || !result.filePaths.length) return stickerListWithUrls();
+    await addStickers(stickerRoot(), result.filePaths);
+    return stickerListWithUrls();
+  });
+  ipcMain.handle("stickers:delete", async (_event, id) => {
+    await deleteSticker(stickerRoot(), id);
+    return stickerListWithUrls();
   });
   ipcMain.handle("gifs:choose-images", async () => {
     const result = await dialog.showOpenDialog({ properties: ["openFile", "multiSelections"], filters: [{ name: "이미지", extensions: ["png", "jpg", "jpeg", "webp", "avif", "gif", "bmp"] }] });
@@ -958,26 +1035,47 @@ function registerIpc() {
     });
   });
   ipcMain.handle("assets:list", (_event, projectId) => store.listAssets(requiredText(projectId, "프로젝트 ID")));
+  ipcMain.handle("assets:ai-logs", () => aiCensorshipLogs.map((entry) => ({ ...entry })));
   ipcMain.handle("assets:ai-censor", async (event, input) => {
     if (activeAiCensorshipPromise) throw new Error("이미 AI 검열 작업이 실행 중입니다.");
+    const packagedWorkerPath = app.isPackaged ? aiRuntime.installedWorkerPath() : "";
+    if (app.isPackaged && !packagedWorkerPath) throw new Error("AI 검열 기능이 설치되어 있지 않거나 현재 버전과 호환되지 않습니다.");
     const project = store.getProject(requiredText(input?.projectId, "프로젝트 ID"));
     if (!project || !project.censorshipConfig.enabled) throw new Error("에셋 검열이 활성화된 프로젝트를 찾을 수 없습니다.");
     const requestedIds = new Set(Array.isArray(input?.assetIds) ? input.assetIds.filter((id) => typeof id === "string") : []);
     const assets = store.listAssets(project.id).filter((asset) => requestedIds.has(asset.id));
     if (!assets.length || assets.length !== requestedIds.size) throw new Error("작업할 이미지 목록이 올바르지 않습니다.");
     const settings = input?.settings && typeof input.settings === "object" ? input.settings : {};
+    appendAiCensorshipLog("info", `작업 시작 · ${project.name} · 이미지 ${assets.length}개 · 모델 ${path.basename(String(settings.modelPath || "")) || "미지정"}`);
     const controller = new AbortController();
     activeAiCensorshipController = controller;
     const task = runAiCensorship({
       project,
       assets,
       settings,
-      onProgress: (progress) => { if (!event.sender.isDestroyed()) event.sender.send("assets:ai-progress", progress); },
-      onResult: (asset, status, cleanedPath) => store.setAssetReview(asset.id, status, cleanedPath),
+      workerPath: packagedWorkerPath,
+      onProgress: (progress) => {
+        if (progress.stage === "detecting" && progress.completed === 0) appendAiCensorshipLog("info", progress.message);
+        if (!event.sender.isDestroyed()) event.sender.send("assets:ai-progress", progress);
+      },
+      onResult: (asset, status, cleanedPath, errorMessage, detectionCount) => {
+        const result = store.setAssetReview(asset.id, status, cleanedPath);
+        if (status === "failed") appendAiCensorshipLog("error", `실패 · ${asset.relativePath} · ${errorMessage || "원인을 확인할 수 없습니다."}`);
+        else if (detectionCount === 0) appendAiCensorshipLog("info", `대상 없음 · ${asset.relativePath}`);
+        else appendAiCensorshipLog("success", `완료 · ${asset.relativePath} · 마스크 ${detectionCount}개`);
+        return result;
+      },
       signal: controller.signal
     });
     activeAiCensorshipPromise = task;
-    try { return await task; }
+    try {
+      const result = await task;
+      appendAiCensorshipLog(result.failed ? "warning" : "success", `작업 완료 · 성공 ${result.succeeded}개 · 실패 ${result.failed}개`);
+      return result;
+    } catch (error) {
+      appendAiCensorshipLog(error.code === "ABORT_ERR" ? "warning" : "error", `${error.code === "ABORT_ERR" ? "작업 취소" : "작업 중단"} · ${error.message}`);
+      throw error;
+    }
     finally {
       if (activeAiCensorshipPromise === task) activeAiCensorshipPromise = null;
       if (activeAiCensorshipController === controller) activeAiCensorshipController = null;
@@ -985,6 +1083,7 @@ function registerIpc() {
   });
   ipcMain.handle("assets:cancel-ai", async () => {
     if (!activeAiCensorshipPromise || !activeAiCensorshipController) return false;
+    appendAiCensorshipLog("warning", "작업 취소 요청");
     activeAiCensorshipController.abort();
     await Promise.race([activeAiCensorshipPromise.catch(() => {}), new Promise((resolve) => setTimeout(resolve, 5000))]);
     return true;
@@ -1009,11 +1108,11 @@ function registerIpc() {
     if (!asset) throw new Error("삭제할 이미지를 찾을 수 없습니다.");
     return withStagedFileDeletion([asset.savedPath, asset.cleanedPath], () => store.removeAsset(id));
   });
-  ipcMain.handle("assets:set-review", (_event, assetId, status) => {
+  ipcMain.handle("assets:set-review", (_event, assetId, status, options) => {
     const id = requiredText(assetId, "에셋 ID");
     const previous = censoredSaveQueues.get(id) || Promise.resolve();
     const queued = previous.catch(() => {}).then(async () => {
-      if (status === "unreviewed") {
+      if (status === "unreviewed" && options?.preserveCensored !== true) {
         const asset = store.getAsset(id);
         const project = asset ? store.getProject(asset.projectId) : null;
         if (project && asset) await ensureCensorshipCopy(project, asset, true);
@@ -1121,6 +1220,7 @@ app.whenReady().then(async () => {
   await new Promise((resolve) => setTimeout(resolve, 0));
   const databasePath = path.join(app.getPath("userData"), "aaa.sqlite");
   store = new Store(databasePath);
+  aiRuntime = new AiRuntimeManager(app);
   protocol.handle("aaa-asset", async (request) => {
     const url = new URL(request.url);
     if (url.hostname === "local") {
@@ -1137,6 +1237,21 @@ app.whenReady().then(async () => {
         if (!preview || !fs.existsSync(preview.filePath)) return responseWithCors("Not found", { status: 404 });
         const fetched = await net.fetch(pathToFileURL(preview.filePath).toString());
         return responseWithCors(fetched.body, { status: fetched.status, headers: fetched.headers });
+      }
+      if (parts[0] === "sticker") {
+        let localPath;
+        try { localPath = stickerPath(stickerRoot(), decodeURIComponent(parts[1] || "")); }
+        catch { return responseWithCors("Not found", { status: 404 }); }
+        if (!fs.existsSync(localPath)) return responseWithCors("Not found", { status: 404 });
+        const fetched = await net.fetch(pathToFileURL(localPath).toString());
+        return responseWithCors(fetched.body, { status: fetched.status, headers: { ...Object.fromEntries(fetched.headers), "Cache-Control": "private, max-age=31536000, immutable" } });
+      }
+      if (parts[0] === "twemoji") {
+        let localPath;
+        try { localPath = twemojiSvgPath(decodeURIComponent(parts[1] || "").replace(/\.svg$/i, "")); }
+        catch { return responseWithCors("Not found", { status: 404 }); }
+        if (!fs.existsSync(localPath)) return responseWithCors("Not found", { status: 404 });
+        return responseWithCors(await fs.promises.readFile(localPath), { headers: { "Content-Type": "image/svg+xml", "Cache-Control": "private, max-age=31536000, immutable" } });
       }
       if (parts[0] === "asset") {
         const id = decodeURIComponent(parts[1] || "");
@@ -1169,6 +1284,7 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
+  aiRuntime?.cancelInstall();
   for (const preview of animationPreviewFiles.values()) {
     try { fs.unlinkSync(preview.filePath); } catch {}
   }

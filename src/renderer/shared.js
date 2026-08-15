@@ -1,9 +1,22 @@
 const EXTENSIONS = [".png", ".webp", ".jpg", ".jpeg", ".avif", ".gif"];
 const ORIGINAL_EXTENSION = "original";
 const TRACKED_EXTENSIONS = [...EXTENSIONS, ".bmp"];
-const DEFAULT_SHORTCUTS = { home: "F1", management: "F2", classification: "F3", censorship: "F4", progress: "F5" };
-const DEFAULT_CENSOR_SHORTCUTS = { previous: "Z", next: "C", undo: "Ctrl+Z", brushIncrease: "WheelUp", brushDecrease: "WheelDown", hardnessIncrease: "Ctrl+WheelUp", hardnessDecrease: "Ctrl+WheelDown", opacityIncrease: "Shift+WheelUp", opacityDecrease: "Shift+WheelDown", zoomIncrease: "Alt+WheelUp", zoomDecrease: "Alt+WheelDown", lineModifier: "shift" };
-const DEFAULT_CENSORSHIP = { targets: ["nipple", "penis", "vulva", "anus"], confidence: 50, imageSize: 640, dilation: 8, method: "solid", shape: "circle", color: "#ffffff", size: 48, hardness: 80, opacity: 100, modelPath: "" };
+const DEFAULT_SHORTCUTS = {
+  home: "F1",
+  management: "F2",
+  work: "F3",
+  prompts: "F4",
+  lorebook: "F5",
+  situation: "F6",
+  classification: "F7",
+  censorship: "F8",
+  export: "F9",
+  settings: "F12"
+};
+const DEFAULT_CENSOR_SHORTCUTS = { previous: "Z", manualToggle: "X", next: "C", originalPreview: "Q", brushEraserToggle: "A", methodCycle: "S", shapeToggle: "D", sidebarToggle: "/", undo: "Ctrl+Z", redo: "Ctrl+Y", brushIncrease: "WheelUp", brushDecrease: "WheelDown", hardnessIncrease: "Ctrl+WheelUp", hardnessDecrease: "Ctrl+WheelDown", opacityIncrease: "Shift+WheelUp", opacityDecrease: "Shift+WheelDown", zoomIncrease: "Alt+WheelUp", zoomDecrease: "Alt+WheelDown", lineModifier: "shift" };
+const CENSOR_TARGET_OPTIONS = [["nipple", "유두"], ["vulva", "여성기"], ["anus", "항문"], ["penis", "남성기"], ["testicles", "고환"], ["x_ray", "엑스레이"], ["cross_section", "단면"]];
+const DEFAULT_CENSORSHIP = { targets: CENSOR_TARGET_OPTIONS.map(([value]) => value), confidence: 50, imageSize: 1024, dilation: 8, method: "solid", shape: "circle", color: "#ffffff", size: 48, hardness: 80, opacity: 100, modelPath: "" };
+const DEFAULT_STICKERS = { favoriteEmojiIds: [] };
 const censorEditFlushers = new Set();
 
 function registerCensorEditFlusher(flush) {
@@ -53,7 +66,7 @@ function normalizeProject(project) {
   if (!project) return project;
   return {
     ...project,
-    censorshipConfig: { enabled: project.censorshipConfig?.enabled === true, targets: ["nipple", "penis", "vulva", "anus"], method: project.censorshipConfig?.method === "block" ? "solid" : project.censorshipConfig?.method || "solid", color: "#ffffff", modelPath: "", outputExtension: ".png", ...project.censorshipConfig, outputPath: undefined, ...(project.censorshipConfig?.method === "block" ? { method: "solid" } : {}) },
+    censorshipConfig: { enabled: project.censorshipConfig?.enabled === true, targets: CENSOR_TARGET_OPTIONS.map(([value]) => value), method: project.censorshipConfig?.method === "block" ? "solid" : project.censorshipConfig?.method || "solid", color: "#ffffff", modelPath: "", outputExtension: ".png", ...project.censorshipConfig, outputPath: undefined, ...(project.censorshipConfig?.method === "block" ? { method: "solid" } : {}) },
     tags: (project.tags || []).map((tag) => ({
       ...tag,
       values: (tag.values || []).map((item) => {
@@ -131,4 +144,4 @@ function matchesProjectPath(project, relativePath) {
   return new RegExp(`^${pattern}$`, "i").test(withoutExtension(relativePath).replaceAll("\\", "/"));
 }
 
-export { EXTENSIONS, ORIGINAL_EXTENSION, TRACKED_EXTENSIONS, DEFAULT_SHORTCUTS, DEFAULT_CENSOR_SHORTCUTS, DEFAULT_CENSORSHIP, shortcutFromEvent, matchesShortcut, savedShortcuts, savedCensorShortcuts, savedCensorshipSettings, wheelShortcutFromEvent, matchesInputShortcut, editableRule, storedRule, normalizeProject, combinations, renderPath, findPathRuleCollision, withoutExtension, matchesProjectPath, registerCensorEditFlusher, flushCensorEdits };
+export { EXTENSIONS, ORIGINAL_EXTENSION, TRACKED_EXTENSIONS, DEFAULT_SHORTCUTS, DEFAULT_CENSOR_SHORTCUTS, CENSOR_TARGET_OPTIONS, DEFAULT_CENSORSHIP, DEFAULT_STICKERS, shortcutFromEvent, matchesShortcut, savedShortcuts, savedCensorShortcuts, savedCensorshipSettings, wheelShortcutFromEvent, matchesInputShortcut, editableRule, storedRule, normalizeProject, combinations, renderPath, findPathRuleCollision, withoutExtension, matchesProjectPath, registerCensorEditFlusher, flushCensorEdits };
