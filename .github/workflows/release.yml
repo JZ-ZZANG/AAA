@@ -27,7 +27,28 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Build and upload draft release
-        run: npm run release
+      - name: Build Windows installer
+        run: npm run dist
+
+      - name: Create or update draft release
+        shell: pwsh
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $version = node -p "require('./package.json').version"
+          $installer = "release/AAA-Setup-$version-x64.exe"
+          $assets = @($installer, "$installer.blockmap", "release/latest.yml")
+
+          foreach ($asset in $assets) {
+            if (-not (Test-Path -LiteralPath $asset)) {
+              throw "Release asset not found: $asset"
+            }
+          }
+
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --draft --generate-notes --title "AAA $tag" --verify-tag
+          }
+
+          gh release upload $tag $assets --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
