@@ -5,5 +5,6 @@
 - `ULTRALYTICS-AGPL-3.0.txt`: Ultralytics 8.4.120
 - `TWEMOJI-MIT.txt`: Twemoji 코드
 - `TWEMOJI-CC-BY-4.0.txt`: Twemoji SVG 그래픽
+- `LUCIDE-ISC.txt`: Lucide 아이콘
 
 원문을 요약하거나 수정하지 않고 그대로 보관합니다.

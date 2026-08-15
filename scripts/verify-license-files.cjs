@@ -6,7 +6,8 @@ const requiredFiles = [
   ["LICENSE", "GNU AGPL v3 원문"],
   ["licenses/ULTRALYTICS-AGPL-3.0.txt", "Ultralytics AGPL 원문"],
   ["licenses/TWEMOJI-MIT.txt", "Twemoji MIT 원문"],
-  ["licenses/TWEMOJI-CC-BY-4.0.txt", "Twemoji CC BY 4.0 원문"]
+  ["licenses/TWEMOJI-CC-BY-4.0.txt", "Twemoji CC BY 4.0 원문"],
+  ["licenses/LUCIDE-ISC.txt", "Lucide ISC 및 Feather MIT 원문"]
 ];
 
 const missing = requiredFiles.filter(([relativePath]) => {
