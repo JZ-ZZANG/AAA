@@ -36,7 +36,7 @@ jobs:
       - name: Build AI Runtime package
         run: npm run dist:ai
 
-      - name: Publish AI Runtime pre-release
+      - name: Create AI Runtime draft
         shell: pwsh
         run: |
           $runtimeVersion = (Get-Content ai-runtime/runtime.json | ConvertFrom-Json).runtimeVersion
@@ -44,7 +44,8 @@ jobs:
             "ai-release/AAA-AI-Runtime-$runtimeVersion.zip" `
             "ai-release/AAA-AI-Runtime-$runtimeVersion.sha256" `
             "ai-release/runtime.json" `
-            --prerelease `
+            --draft `
+            --latest=false `
             --generate-notes `
             --title "AAA AI Runtime $env:GITHUB_REF_NAME"
         env:

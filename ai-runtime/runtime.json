@@ -1,5 +1,5 @@
 {
-  "runtimeVersion": "1.0.0",
+  "runtimeVersion": "1.0.1",
   "protocolVersion": 1,
   "pythonVersion": "3.11",
   "torchVersion": "2.13.0+cpu",
