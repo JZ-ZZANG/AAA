@@ -3,9 +3,12 @@
 /docs
 /templates
 
+# JavaScript / TypeScript 빌드 산출물
 /node_modules
 /dist
+/electron-dist
 /release
+*.tsbuildinfo
 
 # Python / PyInstaller 빌드 산출물
 __pycache__/

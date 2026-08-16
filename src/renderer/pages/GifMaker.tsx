@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Clock3, Copy, ImagePlus, Layers3, Save, Trash2 } from "lucide-react";
-import { ProjectTitlebarNav } from "../components/Shell.jsx";
+import { ProjectTitlebarNav } from "../components/Shell";
 
 const makeTrack = () => ({ id: crypto.randomUUID(), frames: [] });
 const makeFrame = (path) => ({ id: crypto.randomUUID(), path, duration: 500 });

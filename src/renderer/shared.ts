@@ -14,14 +14,14 @@ const DEFAULT_SHORTCUTS = {
   settings: "F12"
 };
 const DEFAULT_CENSOR_SHORTCUTS = { previous: "Z", manualToggle: "X", next: "C", originalPreview: "Q", brushEraserToggle: "A", methodCycle: "S", shapeToggle: "D", sidebarToggle: "/", undo: "Ctrl+Z", redo: "Ctrl+Y", brushIncrease: "WheelUp", brushDecrease: "WheelDown", hardnessIncrease: "Ctrl+WheelUp", hardnessDecrease: "Ctrl+WheelDown", opacityIncrease: "Shift+WheelUp", opacityDecrease: "Shift+WheelDown", zoomIncrease: "Alt+WheelUp", zoomDecrease: "Alt+WheelDown", lineModifier: "shift" };
-const CENSOR_TARGET_OPTIONS = [["nipple", "유두"], ["vulva", "여성기"], ["anus", "항문"], ["penis", "남성기"], ["testicles", "고환"], ["x_ray", "엑스레이"], ["cross_section", "단면"]];
+const CENSOR_TARGET_OPTIONS: Array<[string, string]> = [["nipple", "유두"], ["vulva", "여성기"], ["anus", "항문"], ["penis", "남성기"], ["testicles", "고환"], ["x_ray", "엑스레이"], ["cross_section", "단면"]];
 const DEFAULT_CENSORSHIP = { targets: CENSOR_TARGET_OPTIONS.map(([value]) => value), confidence: 50, imageSize: 1024, dilation: 8, method: "solid", shape: "circle", color: "#ffffff", size: 48, hardness: 80, opacity: 100, modelPath: "" };
 const DEFAULT_STICKERS = { favoriteEmojiIds: [] };
-const censorEditFlushers = new Set();
+const censorEditFlushers = new Set<() => unknown>();
 
 function registerCensorEditFlusher(flush) {
   censorEditFlushers.add(flush);
-  return () => censorEditFlushers.delete(flush);
+  return () => { censorEditFlushers.delete(flush); };
 }
 
 async function flushCensorEdits() {
@@ -80,8 +80,8 @@ function normalizeProject(project) {
   };
 }
 
-function combinations(tags) {
-  return tags.reduce(
+function combinations(tags: any[]): any[] {
+  return tags.reduce<any[]>(
     (rows, tag) => rows.flatMap((row) => tag.values.map((value) => ({ selections: { ...row.selections, [tag.id]: value.id }, labels: [...row.labels, value.label || value.value] }))),
     [{ selections: {}, labels: [] }]
   );

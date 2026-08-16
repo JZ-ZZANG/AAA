@@ -52,7 +52,7 @@ async function readJson(filePath) {
   return JSON.parse(await fs.promises.readFile(filePath, "utf8"));
 }
 
-function runCommand(command, args, options = {}) {
+function runCommand(command, args, options: any = {}): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { windowsHide: true, ...options });
     let output = "";
@@ -75,7 +75,7 @@ async function sha256(filePath) {
 async function fetchJson(url) {
   const response = await net.fetch(url, { headers: { Accept: "application/vnd.github+json", "User-Agent": "AAA" } });
   if (!response.ok) throw new Error(`GitHub에서 AI 검열 기능 정보를 확인하지 못했습니다. (${response.status})`);
-  return response.json();
+  return await response.json() as any[];
 }
 
 async function downloadFile(url, destination, onProgress, signal) {
@@ -114,7 +114,12 @@ async function validateExtractedTree(rootPath) {
 }
 
 class AiRuntimeManager {
-  constructor(app, options = {}) {
+  app: any;
+  rootPath: string;
+  requestPath: string;
+  installController: AbortController | null;
+
+  constructor(app, options: any = {}) {
     this.app = app;
     this.rootPath = assertSafeRuntimeRoot(options.rootPath || runtimeRootPath(app));
     this.requestPath = options.requestPath || path.join(app.getPath("userData"), "install-ai-runtime-requested");
@@ -188,7 +193,7 @@ class AiRuntimeManager {
     };
   }
 
-  async installArchive(archivePath, onProgress, expected = {}) {
+  async installArchive(archivePath, onProgress, expected: any = {}) {
     const list = await runCommand("tar", ["-tf", archivePath]);
     const entries = list.split(/\r?\n/).filter(Boolean);
     if (!entries.length || entries.some((entry) => !safeArchiveEntry(entry))) throw new Error("AI 검열 기능 압축 파일에 안전하지 않은 경로가 포함되어 있습니다.");

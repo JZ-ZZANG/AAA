@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Circle, Copy, Droplet, Eraser, Eye, Grid3X3, Home as HomeIcon, LayoutGrid, Minus, MoveDiagonal2, Paintbrush, PaintBucket, Palette, PanelLeftClose, PanelLeftOpen, Pencil, Plus, RectangleHorizontal, RectangleVertical, Redo2, RefreshCcw, RotateCw, ScrollText, Search, Settings as SettingsIcon, SlidersHorizontal, Square, SquareDashed, Star, Sticker, Trash2, Undo2, X } from "lucide-react";
-import { DeleteConfirmModal } from "../components/Shell.jsx";
-import { CENSOR_TARGET_OPTIONS, matchesProjectPath, savedCensorShortcuts, savedCensorshipSettings, matchesInputShortcut, registerCensorEditFlusher, flushCensorEdits } from "../shared.js";
-import { STICKER_FAVORITES_EVENT, readStickerFavoriteIds } from "../sticker-favorites.js";
-import { TWEMOJI_CATEGORIES, categorizedTwemojiIds, twemojiCharacter, twemojiSticker } from "../twemoji-library.js";
+import { DeleteConfirmModal } from "../components/Shell";
+import { CENSOR_TARGET_OPTIONS, matchesProjectPath, savedCensorShortcuts, savedCensorshipSettings, matchesInputShortcut, registerCensorEditFlusher, flushCensorEdits } from "../shared";
+import { STICKER_FAVORITES_EVENT, readStickerFavoriteIds } from "../sticker-favorites";
+import { TWEMOJI_CATEGORIES, categorizedTwemojiIds, twemojiCharacter, twemojiSticker } from "../twemoji-library";
 
 const MAX_UNDO_HISTORY = 20;
 const TWEMOJI_PAGE_SIZE = 96;
@@ -18,7 +18,7 @@ function normalizedSearchText(value) {
   return String(value || "").normalize("NFKC").replaceAll("\\", "/").toLocaleLowerCase();
 }
 
-function ManualCensorEditor({ asset, project, editorSettings, onEditorSettingsChange, onClose, onSaved, onSaveError, onReset, onMarkManual, embedded = false, shortcuts = savedCensorShortcuts() }) {
+function ManualCensorEditor({ asset, project, editorSettings, onEditorSettingsChange, onClose, onSaved, onSaveError, onReset, onMarkManual, embedded = false, shortcuts = savedCensorShortcuts() }: any) {
   const canvasRef = useRef(null);
   const { mode, tool, shape, color, size, hardness, opacity } = editorSettings;
   const updateEditorSetting = (key, value) => onEditorSettingsChange((current) => ({ ...current, [key]: typeof value === "function" ? value(current[key]) : value }));
@@ -80,7 +80,7 @@ function ManualCensorEditor({ asset, project, editorSettings, onEditorSettingsCh
 
   useEffect(() => {
     let active = true;
-    const loadImage = (source) => new Promise((resolve, reject) => {
+    const loadImage = (source) => new Promise<HTMLImageElement>((resolve, reject) => {
       const image = new Image();
       image.crossOrigin = "anonymous";
       image.onload = () => resolve(image);
@@ -403,7 +403,7 @@ function ManualCensorEditor({ asset, project, editorSettings, onEditorSettingsCh
     canvas.getContext("2d").drawImage(patch, left, top);
   }
   function loadStickerImage(sticker) {
-    return new Promise((resolve, reject) => {
+    return new Promise<HTMLImageElement>((resolve, reject) => {
       const image = new Image();
       image.crossOrigin = "anonymous";
       image.onload = () => resolve(image);
@@ -742,13 +742,13 @@ function ManualCensorEditor({ asset, project, editorSettings, onEditorSettingsCh
     strokeStamp.current = null;
     lastPoint.current = null;
   }
-  function cancelAreaStroke(event) {
+  function cancelAreaStroke(event = null) {
     const canvas = canvasRef.current;
     const pointerId = event?.pointerId ?? areaDrag.current?.pointerId;
     if (canvas && pointerId !== undefined && canvas.hasPointerCapture(pointerId)) canvas.releasePointerCapture(pointerId);
     clearStrokeState();
   }
-  function cancelStickerStroke(event) {
+  function cancelStickerStroke(event = null) {
     const canvas = canvasRef.current;
     const pointerId = event?.pointerId ?? stickerDrag.current?.pointerId;
     if (canvas && pointerId !== undefined && canvas.hasPointerCapture(pointerId)) canvas.releasePointerCapture(pointerId);
@@ -813,7 +813,7 @@ function ManualCensorEditor({ asset, project, editorSettings, onEditorSettingsCh
   }
   function adjustByWheel(event) { adjustByShortcut(event); }
   function adjustByShortcut(event) {
-    const actions = [
+    const actions: Array<[string, () => void]> = [
       ["brushIncrease", () => setSize((value) => Math.min(240, value + 4))], ["brushDecrease", () => setSize((value) => Math.max(1, value - 4))],
       ["hardnessIncrease", () => setHardness((value) => Math.min(100, value + 5))], ["hardnessDecrease", () => setHardness((value) => Math.max(0, value - 5))],
       ["opacityIncrease", () => setOpacity((value) => Math.min(100, value + 5))], ["opacityDecrease", () => setOpacity((value) => Math.max(0, value - 5))],
@@ -869,7 +869,7 @@ function ManualCensorEditor({ asset, project, editorSettings, onEditorSettingsCh
           <button className={`editor-icon-button editor-tool-button brush-mode-toggle ${mode}`} aria-label={mode === "brush" ? "브러쉬" : "지우개"} data-tooltip={mode === "brush" ? "브러쉬" : "지우개"} onClick={() => { setAreaToolActive(false); setStickerToolActive(false); setMode(mode === "brush" ? "eraser" : "brush"); }}>{mode === "brush" ? <Paintbrush size={16} /> : <Eraser size={16} />}</button>
           <div className="method-settings-menu" ref={methodMenuRef}>
             <button className="editor-icon-button editor-tool-button" aria-label={methodLabel} aria-expanded={methodMenuOpen} aria-haspopup="menu" data-tooltip={methodLabel} onClick={() => { setMethodMenuOpen((current) => !current); setBrushSettingsOpen(false); }}><MethodIcon size={16} /></button>
-            {methodMenuOpen && <div className="method-settings-popover" role="menu">{[["solid", "단색", PaintBucket], ["blur", "블러", Droplet], ["mosaic", "모자이크", Grid3X3]].map(([value, label, Icon]) => <button type="button" className={tool === value ? "active" : ""} role="menuitem" key={value} onClick={() => { setAreaToolActive(false); setStickerToolActive(false); setTool(value); setMethodMenuOpen(false); }}><Icon size={16} /><span>{label}</span></button>)}</div>}
+            {methodMenuOpen && <div className="method-settings-popover" role="menu">{[["solid", "단색", PaintBucket], ["blur", "블러", Droplet], ["mosaic", "모자이크", Grid3X3]].map(([value, label, Icon]: any[]) => <button type="button" className={tool === value ? "active" : ""} role="menuitem" key={value} onClick={() => { setAreaToolActive(false); setStickerToolActive(false); setTool(value); setMethodMenuOpen(false); }}><Icon size={16} /><span>{label}</span></button>)}</div>}
           </div>
           <button className="editor-icon-button editor-tool-button" aria-label={shape === "circle" ? "원형" : "사각형"} data-tooltip={shape === "circle" ? "원형" : "사각형"} onClick={() => { setAreaToolActive(false); setStickerToolActive(false); setShape(shape === "circle" ? "square" : "circle"); }}>{shape === "circle" ? <Circle size={16} /> : <Square size={16} />}</button>
           <label className="editor-color-button" title={`브러쉬 색상 ${color}`}><input type="color" aria-label="브러쉬 색상" value={color} onChange={(event) => setColor(event.target.value)} /></label>
@@ -989,8 +989,10 @@ function Censorship({ project }) {
   const [assets, setAssets] = useState([]); const [filter, setFilter] = useState("all"); const [selectedId, setSelectedId] = useState("");
   const [listEditing, setListEditing] = useState(false);
   const [listSelectedIds, setListSelectedIds] = useState([]);
+  const listSelectionAnchorId = useRef<string | null>(null);
   const [listTargetStatus, setListTargetStatus] = useState("unreviewed");
   const [listEditSaving, setListEditSaving] = useState(false);
+  const [listResetConfirmOpen, setListResetConfirmOpen] = useState(false);
   const [aiModal, setAiModal] = useState(false);
   const [aiScope, setAiScope] = useState("unreviewed");
   const [aiSelectedIds, setAiSelectedIds] = useState([]);
@@ -1094,10 +1096,22 @@ function Censorship({ project }) {
   function toggleListEditing() {
     setListEditing((current) => !current);
     setListSelectedIds([]);
+    listSelectionAnchorId.current = null;
     setEditorError("");
   }
 
-  function toggleListSelection(id) {
+  function toggleListSelection(id, event) {
+    const visibleIds = filtered.map((asset) => asset.id);
+    const anchorIndex = visibleIds.indexOf(listSelectionAnchorId.current);
+    const clickedIndex = visibleIds.indexOf(id);
+    if (event.shiftKey && anchorIndex >= 0 && clickedIndex >= 0) {
+      const start = Math.min(anchorIndex, clickedIndex);
+      const end = Math.max(anchorIndex, clickedIndex);
+      const rangeIds = visibleIds.slice(start, end + 1);
+      setListSelectedIds((current) => [...new Set([...current, ...rangeIds])]);
+      return;
+    }
+    listSelectionAnchorId.current = id;
     setListSelectedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
   }
 
@@ -1105,20 +1119,45 @@ function Censorship({ project }) {
     const visibleIds = filtered.map((asset) => asset.id);
     const allSelected = visibleIds.length > 0 && visibleIds.every((id) => listSelectedIds.includes(id));
     setListSelectedIds((current) => allSelected ? current.filter((id) => !visibleIds.includes(id)) : [...new Set([...current, ...visibleIds])]);
+    listSelectionAnchorId.current = null;
   }
 
   async function applyListStatus() {
+    if (!listSelectedIds.length || listEditSaving) return;
+    if (listTargetStatus === "reset") {
+      setListResetConfirmOpen(true);
+      return;
+    }
+    setListEditSaving(true);
+    setEditorError("");
+    try {
+      await flushCensorEdits();
+      await Promise.all(listSelectedIds.map((id) => window.aaa.assets.setReview(id, listTargetStatus, listTargetStatus === "unreviewed" ? { preserveCensored: true } : undefined)));
+      await load();
+      setSelectedId("");
+      setListSelectedIds([]);
+      listSelectionAnchorId.current = null;
+    } catch (error) { setEditorError(`상태를 변경하지 못했습니다: ${error.message}`); }
+    finally { setListEditSaving(false); }
+  }
+
+  async function resetSelectedWork() {
     if (!listSelectedIds.length || listEditSaving) return;
     setListEditSaving(true);
     setEditorError("");
     try {
       await flushCensorEdits();
-      await Promise.all(listSelectedIds.map((id) => window.aaa.assets.setReview(id, listTargetStatus)));
+      await Promise.all(listSelectedIds.map((id) => window.aaa.assets.setReview(id, "unreviewed", { preserveCensored: false })));
       await load();
       setSelectedId("");
       setListSelectedIds([]);
-    } catch (error) { setEditorError(`상태를 변경하지 못했습니다: ${error.message}`); }
-    finally { setListEditSaving(false); }
+      listSelectionAnchorId.current = null;
+      setListTargetStatus("unreviewed");
+    } catch (error) { setEditorError(`작업을 초기화하지 못했습니다: ${error.message}`); }
+    finally {
+      setListEditSaving(false);
+      setListResetConfirmOpen(false);
+    }
   }
 
   async function startAiCensorship() {
@@ -1156,7 +1195,8 @@ function Censorship({ project }) {
   const visibleListIds = filtered.map((asset) => asset.id);
   const allVisibleListSelected = visibleListIds.length > 0 && visibleListIds.every((id) => listSelectedIds.includes(id));
 
-  return <><div className="censorship-workspace"><aside className="censorship-sidebar"><div><div className="ai-censorship-actions"><button className="primary-button full" disabled={!aiRuntimeAvailable} title={aiRuntimeAvailable ? "" : "AI 검열 패키지가 설치되어 있지 않습니다."} onClick={openAiModal}>AI 검열</button><button className="outline-button ai-log-button" aria-label="AI 검열 로그" data-tooltip="로그" onClick={openAiLogModal}><ScrollText size={17} /></button></div>{editorError && <p className="error">{editorError}</p>}</div><div className="censorship-list-tools"><div className="censorship-list-filter"><select aria-label="검열 상태 필터" value={filter} disabled={listEditSaving} onChange={(event) => changeFilter(event.target.value)}><option value="all">전체</option><option value="unreviewed">대기</option><option value="auto">자동완료</option><option value="manual">수동완료</option><option value="failed">실패</option></select><button className={`outline-button censorship-list-edit-button ${listEditing ? "active" : ""}`} aria-label={listEditing ? "목록 편집 종료" : "목록 편집"} data-tooltip={listEditing ? "편집 종료" : "편집"} disabled={listEditSaving} onClick={toggleListEditing}>{listEditing ? <X size={17} /> : <Pencil size={16} />}</button></div>{listEditing && <div className="censorship-bulk-editor"><button className="outline-button censorship-select-all-button" aria-label={allVisibleListSelected ? "현재 목록 전체 선택 해제" : "현재 목록 전체 선택"} title={allVisibleListSelected ? "전체 선택 해제" : "전체 선택"} disabled={!visibleListIds.length || listEditSaving} onClick={toggleVisibleListSelection}><span className={`censorship-list-check ${allVisibleListSelected ? "checked" : ""}`}>{allVisibleListSelected && <Check size={12} />}</span></button><select aria-label="변경할 검열 상태" value={listTargetStatus} disabled={listEditSaving} onChange={(event) => setListTargetStatus(event.target.value)}><option value="unreviewed">대기</option><option value="auto">자동완료</option><option value="manual">수동완료</option><option value="failed">실패</option></select><button className="primary-button" disabled={!listSelectedIds.length || listEditSaving} onClick={applyListStatus}>{listEditSaving ? "변경 중" : "변경"}</button></div>}</div><div className={`censorship-file-list ${listEditing ? "editing" : ""}`}>{visible.map((asset) => { const checked = listSelectedIds.includes(asset.id); return <button className={listEditing ? (checked ? "active" : "") : selected?.id === asset.id ? "active" : ""} key={asset.id} onClick={() => listEditing ? toggleListSelection(asset.id) : selectAsset(asset.id)}>{listEditing ? <span className={`censorship-list-check ${checked ? "checked" : ""}`}>{checked && <Check size={12} />}</span> : <span className={`review-dot ${asset.reviewStatus}`} />}<span>{asset.relativePath}</span><small>{labels[asset.reviewStatus]}</small></button>; })}</div></aside><main className="censorship-main">{selected ? <ManualCensorEditor key={selected.id} asset={selected} project={project} editorSettings={editorSettings} onEditorSettingsChange={setEditorSettings} embedded onSaved={load} onSaveError={setEditorError} onReset={async () => { await window.aaa.assets.setReview(selected.id, "unreviewed"); await load(); }} onMarkManual={async () => { await window.aaa.assets.setReview(selected.id, "manual"); await load(); }} /> : <div className="empty-state">이미지가 없습니다.</div>}</main></div>
+  return <><div className="censorship-workspace"><aside className="censorship-sidebar"><div><div className="ai-censorship-actions"><button className="primary-button full" disabled={!aiRuntimeAvailable} title={aiRuntimeAvailable ? "" : "AI 검열 패키지가 설치되어 있지 않습니다."} onClick={openAiModal}>AI 검열</button><button className="outline-button ai-log-button" aria-label="AI 검열 로그" data-tooltip="로그" onClick={openAiLogModal}><ScrollText size={17} /></button></div>{editorError && <p className="error">{editorError}</p>}</div><div className="censorship-list-tools"><div className="censorship-list-filter"><select aria-label="검열 상태 필터" value={filter} disabled={listEditSaving} onChange={(event) => changeFilter(event.target.value)}><option value="all">전체</option><option value="unreviewed">대기</option><option value="auto">자동완료</option><option value="manual">수동완료</option><option value="failed">실패</option></select><button className={`outline-button censorship-list-edit-button ${listEditing ? "active" : ""}`} aria-label={listEditing ? "목록 편집 종료" : "목록 편집"} data-tooltip={listEditing ? "편집 종료" : "편집"} disabled={listEditSaving} onClick={toggleListEditing}>{listEditing ? <X size={17} /> : <Pencil size={16} />}</button></div>{listEditing && <div className="censorship-bulk-editor"><button className="outline-button censorship-select-all-button" aria-label={allVisibleListSelected ? "현재 목록 전체 선택 해제" : "현재 목록 전체 선택"} title={allVisibleListSelected ? "전체 선택 해제" : "전체 선택"} disabled={!visibleListIds.length || listEditSaving} onClick={toggleVisibleListSelection}><span className={`censorship-list-check ${allVisibleListSelected ? "checked" : ""}`}>{allVisibleListSelected && <Check size={12} />}</span></button><select aria-label="변경할 검열 상태 또는 작업" value={listTargetStatus} disabled={listEditSaving} onChange={(event) => setListTargetStatus(event.target.value)}><option value="unreviewed">대기</option><option value="auto">자동완료</option><option value="manual">수동완료</option><option value="failed">실패</option><option value="reset">작업 초기화</option></select><button className="primary-button" disabled={!listSelectedIds.length || listEditSaving} onClick={applyListStatus}>변경</button></div>}</div><div className={`censorship-file-list ${listEditing ? "editing" : ""}`}>{visible.map((asset) => { const checked = listSelectedIds.includes(asset.id); return <button className={listEditing ? (checked ? "active" : "") : selected?.id === asset.id ? "active" : ""} key={asset.id} onClick={(event) => listEditing ? toggleListSelection(asset.id, event) : selectAsset(asset.id)}>{listEditing ? <span className={`censorship-list-check ${checked ? "checked" : ""}`}>{checked && <Check size={12} />}</span> : <span className={`review-dot ${asset.reviewStatus}`} />}<span>{asset.relativePath}</span><small>{labels[asset.reviewStatus]}</small></button>; })}</div></aside><main className="censorship-main">{selected ? <ManualCensorEditor key={selected.id} asset={selected} project={project} editorSettings={editorSettings} onEditorSettingsChange={setEditorSettings} embedded onSaved={load} onSaveError={setEditorError} onReset={async () => { await window.aaa.assets.setReview(selected.id, "unreviewed"); await load(); }} onMarkManual={async () => { await window.aaa.assets.setReview(selected.id, "manual"); await load(); }} /> : <div className="empty-state">이미지가 없습니다.</div>}</main></div>
+    {listResetConfirmOpen && <div className="modal-backdrop"><section className="modal delete-modal"><div className="modal-heading"><h2>작업 초기화</h2><button className="modal-close icon-button" aria-label="닫기" disabled={listEditSaving} onClick={() => setListResetConfirmOpen(false)}><X size={18} /></button></div><p><strong>선택한 에셋 {listSelectedIds.length}개</strong><span>상태와 자동·수동 검열 결과를 모두 원본 상태로 초기화합니다.</span><span>이 작업은 되돌릴 수 없습니다.</span></p><div className="modal-actions"><button className="text-button" disabled={listEditSaving} onClick={() => setListResetConfirmOpen(false)}>취소</button><button className="danger-button" disabled={listEditSaving} onClick={resetSelectedWork}>{listEditSaving ? "초기화 중…" : "작업 초기화"}</button></div></section></div>}
     {aiLogModal && <div className={`modal-backdrop ai-log-backdrop ${aiCompletionLog ? "completion" : ""}`} onMouseDown={(event) => { if (!aiCompletionLog && event.target === event.currentTarget) closeAiLogModal(); }}>{aiCompletionLog && <div className="ai-window-drag-region" aria-hidden="true" />}<section className="modal ai-log-modal">
       <div className="modal-heading"><h2>{aiCompletionLog ? "AI 검열 작업 로그" : "AI 검열 로그"}</h2>{!aiCompletionLog && <button className="modal-close" onClick={closeAiLogModal}>×</button>}</div>
       {aiLogError ? <p className="error">{aiLogError}</p> : aiLogs.length ? <div className="ai-log-list">{[...aiLogs].reverse().map((entry) => <div className={`ai-log-entry ${entry.level}`} key={entry.id}><time>{aiLogTime(entry.timestamp)}</time><span>{entry.message}</span></div>)}</div> : <div className="empty-state">로그가 없습니다.</div>}
@@ -1180,7 +1220,7 @@ function Censorship({ project }) {
         </div></section>
         <section className="ai-job-section"><h3>브러쉬 설정</h3><div className="ai-settings-grid">
           <label>방식<select value={aiSettings.method} onChange={(event) => setAiSettings({ ...aiSettings, method: event.target.value })}><option value="solid">단색</option><option value="blur">블러</option><option value="mosaic">모자이크</option></select></label>
-          <label onClick={(event) => { if (!event.target.closest(".brush-color-control")) event.preventDefault(); }}>색상<div className={`brush-color-control ${aiSettings.method !== "solid" ? "disabled" : ""}`}><span aria-hidden="true"><Palette size={17} /></span><input type="color" aria-label="AI 검열 브러쉬 색상" disabled={aiSettings.method !== "solid"} value={aiSettings.color} onChange={(event) => setAiSettings({ ...aiSettings, color: event.target.value })} /></div></label>
+          <label onClick={(event) => { if (!(event.target as Element).closest(".brush-color-control")) event.preventDefault(); }}>색상<div className={`brush-color-control ${aiSettings.method !== "solid" ? "disabled" : ""}`}><span aria-hidden="true"><Palette size={17} /></span><input type="color" aria-label="AI 검열 브러쉬 색상" disabled={aiSettings.method !== "solid"} value={aiSettings.color} onChange={(event) => setAiSettings({ ...aiSettings, color: event.target.value })} /></div></label>
           <label>경도<div className="number-with-unit"><input type="number" min="0" max="100" value={aiSettings.hardness} onChange={(event) => setAiSettings({ ...aiSettings, hardness: Math.max(0, Math.min(100, Number(event.target.value) || 0)) })} /><span>%</span></div></label>
           <label>불투명도<div className="number-with-unit"><input type="number" min="0" max="100" value={aiSettings.opacity} onChange={(event) => setAiSettings({ ...aiSettings, opacity: Math.max(0, Math.min(100, Number(event.target.value) || 0)) })} /><span>%</span></div></label>
           <label>마스크 확장<div className="number-with-unit"><input type="number" min="0" max="100" value={aiSettings.dilation || 0} onChange={(event) => setAiSettings({ ...aiSettings, dilation: Math.max(0, Math.min(100, Number(event.target.value) || 0)) })} /><span>px</span></div></label>

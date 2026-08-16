@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const sharp = require("sharp");
-const { renderCensoredAsset, runProcess } = require("../electron/ai-censorship.cjs");
+const { renderCensoredAsset, runProcess } = require("../electron-dist/ai-censorship.cjs");
 
 sharp.cache(false);
 

@@ -87,7 +87,7 @@ function configureAutoUpdate() {
   setTimeout(() => electronAutoUpdater.checkForUpdates().catch((error) => publishUpdateState({ status: "error", message: error.message })), 1500);
 }
 
-function responseWithCors(body, options = {}) {
+function responseWithCors(body, options: any = {}) {
   const headers = new Headers(options.headers || {});
   headers.set("Access-Control-Allow-Origin", "*");
   return new Response(body, { ...options, headers });

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Circle, Copy, Eraser, Home as HomeIcon, LayoutGrid, Minus, Paintbrush, RectangleHorizontal, RectangleVertical, RotateCcw, Settings as SettingsIcon, Square, Trash2, X } from "lucide-react";
-import { combinations, renderPath, withoutExtension } from "../shared.js";
-import { DeleteConfirmModal } from "../components/Shell.jsx";
+import { combinations, renderPath, withoutExtension } from "../shared";
+import { DeleteConfirmModal } from "../components/Shell";
 
 function Classification({ project, refreshVersion, layout, onLayoutChange }) {
   const pathSegments = project.pathTemplate.split(/[\\/]/);
@@ -80,7 +80,7 @@ function Classification({ project, refreshVersion, layout, onLayoutChange }) {
   }
 
   if (!project.tags.length || !project.pathTemplate) return <div className="empty-state">관리에서 에셋 분류 기준과 에셋 저장 규칙을 추가하세요.</div>;
-  return <><div className="asset-board with-sidebar" style={{ "--board-columns": layout.columns, "--asset-ratio": layout.ratio === "portrait" ? "832 / 1216" : layout.ratio === "landscape" ? "1216 / 832" : "1 / 1" }}>
+  return <><div className="asset-board with-sidebar" style={{ "--board-columns": layout.columns, "--asset-ratio": layout.ratio === "portrait" ? "832 / 1216" : layout.ratio === "landscape" ? "1216 / 832" : "1 / 1" } as React.CSSProperties}>
     <aside className="board-sidebar"><div className="sidebar-layout-controls"><button aria-label={`${layout.columns}단`} data-tooltip={`${layout.columns}단`} onClick={cycleColumns}><LayoutGrid size={17} /><span>{layout.columns}</span></button><button aria-label={ratioLabels[layout.ratio]} data-tooltip={ratioLabels[layout.ratio]} onClick={cycleRatio}>{layout.ratio === "landscape" ? <RectangleHorizontal size={19} /> : layout.ratio === "portrait" ? <RectangleVertical size={19} /> : <Square size={17} />}</button></div>{sidebarTags.length > 0 && <><strong>{sidebarTags.map((tag) => tag.name).join(" · ")}</strong>{sidebarOptions.map((option) => { const active = Object.entries(option.selections).every(([tagId, valueId]) => folderSelections[tagId] === valueId); return <button className={active ? "active" : ""} key={Object.values(option.selections).join(":")} onClick={() => setFolderSelections({ ...folderSelections, ...option.selections })}><SelectionCaption tags={sidebarTags} selections={option.selections} /></button>; })}</>}</aside>
     <section className="board-content">
       {filterTags.length > 0 && <div className="board-filters">{filterTags.map((tag) => <div className="filter-group" key={tag.id}><strong>{tag.name}</strong><div>{tag.values.map((value) => <button className={folderSelections[tag.id] === value.id ? "active" : ""} key={value.id} onClick={() => setFolderSelections({ ...folderSelections, [tag.id]: value.id })}><ValueCaption value={value} /></button>)}</div></div>)}</div>}

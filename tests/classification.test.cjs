@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { copyClassifiedAsset, renderRelativePath } = require("../electron/classification.cjs");
+const { copyClassifiedAsset, renderRelativePath } = require("../electron-dist/classification.cjs");
 
 function fixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "aaa-classification-"));

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ClipboardCopy, Plus, Trash2, X } from "lucide-react";
-import { MarkdownEditor } from "../components/MarkdownEditor.jsx";
-import { DeleteConfirmModal } from "../components/Shell.jsx";
+import { MarkdownEditor } from "../components/MarkdownEditor";
+import { DeleteConfirmModal } from "../components/Shell";
 
 function Work({ project }) {
   const [work, setWork] = useState({ projectId: project.id, introduction: "", characterPreference: "ALL", ageRating: "SAFE", tags: [] });

@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
-const { AiRuntimeManager, compareVersions, safeArchiveEntry, validVersion } = require("../electron/ai-runtime.cjs");
+const { AiRuntimeManager, compareVersions, safeArchiveEntry, validVersion } = require("../electron-dist/ai-runtime.cjs");
 
 test("AI Runtime 버전을 비교한다", () => {
   assert.equal(compareVersions("1.0.0", "1.0.0"), 0);

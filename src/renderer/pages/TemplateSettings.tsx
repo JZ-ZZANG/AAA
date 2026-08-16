@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { ProjectTitlebarNav } from "../components/Shell.jsx";
-import { Lorebooks } from "./Lorebooks.jsx";
-import { Prompts } from "./Prompts.jsx";
+import { ProjectTitlebarNav } from "../components/Shell";
+import { Lorebooks } from "./Lorebooks";
+import { Prompts } from "./Prompts";
 
 const TEMPLATE_SCOPE = { id: "global-templates", savePath: "" };
 

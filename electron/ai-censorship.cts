@@ -64,7 +64,7 @@ function detectionRegion(detection, imageWidth, imageHeight, dilation) {
   return { left, top, width: right - left, height: bottom - top, polygon: polygon.map(([x, y]) => [x - left, y - top]) };
 }
 
-async function renderCensoredAsset(inputPath, outputPath, detections, settings = {}) {
+async function renderCensoredAsset(inputPath, outputPath, detections, settings: any = {}) {
   let inputStats;
   try { inputStats = await fs.promises.stat(inputPath); }
   catch (error) { if (error.code === "ENOENT") throw new Error("원본 이미지 파일을 찾을 수 없습니다."); throw error; }
@@ -94,7 +94,7 @@ async function renderCensoredAsset(inputPath, outputPath, detections, settings =
 }
 
 function cancellationError() {
-  const error = new Error("AI 검열 작업이 취소되었습니다.");
+  const error = new Error("AI 검열 작업이 취소되었습니다.") as Error & { code?: string };
   error.code = "ABORT_ERR";
   return error;
 }
@@ -111,7 +111,7 @@ function runProcess(command, args, onMessage, signal) {
     let errors = "";
     let settled = false;
     let forceTimer = null;
-    const settle = (callback, value) => {
+    const settle = (callback, value = undefined) => {
       if (settled) return;
       settled = true;
       signal?.removeEventListener("abort", abort);

@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { addStickers, deleteSticker, listStickers, safeStickerId, stickerPath } = require("../electron/stickers.cjs");
+const { addStickers, deleteSticker, listStickers, safeStickerId, stickerPath } = require("../electron-dist/stickers.cjs");
 
 test("사용자 스티커를 PNG로 정규화해 저장하고 삭제한다", async (context) => {
   const temporaryRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), "aaa-stickers-"));

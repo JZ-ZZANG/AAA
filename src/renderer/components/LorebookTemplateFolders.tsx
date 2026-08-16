@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, ChevronRight, FolderPlus, GripVertical, LibraryBig, Pencil, Plus, Trash2, X } from "lucide-react";
 
-function EntrySidebar({ entryLabel, folders, entries, selectedId, onSelect, onCreateEntry, onCreateFolder, onRenameFolder, onDeleteFolder, onMove, onReorder, onOpenTemplates = null, renderEntryMeta = null, headerActions = null }) {
+function EntrySidebar({ entryLabel, folders, entries, selectedId, onSelect, onCreateEntry, onCreateFolder, onRenameFolder, onDeleteFolder, onMove, onReorder, onOpenTemplates = null, renderEntryMeta = null, headerActions = null }: any) {
   const compactActions = true;
   const [expanded, setExpanded] = useState(() => new Set());
   const [creating, setCreating] = useState(false);

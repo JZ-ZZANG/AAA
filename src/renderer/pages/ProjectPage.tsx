@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
-import { savedShortcuts, matchesShortcut } from "../shared.js";
-import { ProjectTitlebarNav } from "../components/Shell.jsx";
-import { Settings } from "./Management.jsx";
-import { Classification } from "./Classification.jsx";
-import { Censorship } from "./Censorship.jsx";
-import { Prompts } from "./Prompts.jsx";
-import { Lorebooks } from "./Lorebooks.jsx";
-import { Work } from "./Work.jsx";
-import { ExportProject } from "./Export.jsx";
+import { savedShortcuts, matchesShortcut } from "../shared";
+import { ProjectTitlebarNav } from "../components/Shell";
+import { Settings } from "./Management";
+import { Classification } from "./Classification";
+import { Censorship } from "./Censorship";
+import { Prompts } from "./Prompts";
+import { Lorebooks } from "./Lorebooks";
+import { Work } from "./Work";
+import { ExportProject } from "./Export";
 
 function ProjectPage({ project, onBack, onProjectChanged, classificationLayout, onClassificationLayoutChange, suspended = false }) {
   const [tab, setTab] = useState("settings");

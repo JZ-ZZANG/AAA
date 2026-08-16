@@ -8,9 +8,9 @@ import {
   findPathRuleCollision,
   storedRule,
   normalizeProject
-} from "../shared.js";
-import { Progress } from "./Progress.jsx";
-import { DeleteConfirmModal } from "../components/Shell.jsx";
+} from "../shared";
+import { Progress } from "./Progress";
+import { DeleteConfirmModal } from "../components/Shell";
 
 function makeId() {
   return crypto.randomUUID();

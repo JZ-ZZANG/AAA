@@ -22,9 +22,9 @@ AI 캐릭터 채팅 사용자를 위한 에셋 관리 도우미
 ## 기술 스택
 
 - Electron, Vite
-- React, JavaScript, CSS  
-- Node.js (Electron 환경)  
-- SQLite (`node:sqlite`) 
+- React, TypeScript, CSS
+- Node.js, SQLite(`node:sqlite`)
+- Python
  
 ---
 ## 개발

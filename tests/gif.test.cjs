@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const sharp = require("sharp");
-const { createAnimation, createAnimationSafely, saveGeneratedAnimation, timelineSegments, MAX_TRACKS } = require("../electron/gif.cjs");
+const { createAnimation, createAnimationSafely, saveGeneratedAnimation, timelineSegments, MAX_TRACKS } = require("../electron-dist/gif.cjs");
 
 sharp.cache(false);
 

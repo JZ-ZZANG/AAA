@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Download, ExternalLink, FolderArchive, Info, Keyboard, Palette, Plus, ShieldCheck, Star, Trash2, Upload } from "lucide-react";
-import { CENSOR_TARGET_OPTIONS, DEFAULT_SHORTCUTS, DEFAULT_CENSOR_SHORTCUTS, DEFAULT_CENSORSHIP, DEFAULT_STICKERS } from "../shared.js";
-import { normalizedStickerFavoriteIds, publishStickerFavoriteIds } from "../sticker-favorites.js";
-import { TWEMOJI_CATEGORIES, categorizedTwemojiIds, twemojiCharacter, twemojiSticker } from "../twemoji-library.js";
-import { DeleteConfirmModal, ShortcutInput } from "../components/Shell.jsx";
+import { CENSOR_TARGET_OPTIONS, DEFAULT_SHORTCUTS, DEFAULT_CENSOR_SHORTCUTS, DEFAULT_CENSORSHIP, DEFAULT_STICKERS } from "../shared";
+import { normalizedStickerFavoriteIds, publishStickerFavoriteIds } from "../sticker-favorites";
+import { TWEMOJI_CATEGORIES, categorizedTwemojiIds, twemojiCharacter, twemojiSticker } from "../twemoji-library";
+import { DeleteConfirmModal, ShortcutInput } from "../components/Shell";
 import discordBlurpleIcon from "../assets/brands/Discord-Symbol-Blurple.svg";
 import discordWhiteIcon from "../assets/brands/Discord-Symbol-White.svg";
 import githubBlackIcon from "../assets/brands/GitHub_Invertocat_Black.svg";
@@ -11,7 +11,7 @@ import githubWhiteIcon from "../assets/brands/GitHub_Invertocat_White.svg";
 import aaaLogoBlack from "../assets/app/AAA_logo_black.svg";
 import aaaLogoWhite from "../assets/app/AAA_logo_white.svg";
 
-const SETTINGS_TABS = [
+const SETTINGS_TABS: Array<[string, string, any]> = [
   ["general", "일반", Palette],
   ["censorship", "검열 설정", ShieldCheck],
   ["shortcuts", "단축키", Keyboard],
@@ -78,7 +78,7 @@ function AppSettings({ preferences, onChange, onBack, updateState, onCheckUpdate
   const [favoritePickerLimit, setFavoritePickerLimit] = useState(STICKER_PICKER_PAGE_SIZE);
   const [deleteStickerTarget, setDeleteStickerTarget] = useState(null);
   const [stickerDeleting, setStickerDeleting] = useState(false);
-  const [aiRuntime, setAiRuntime] = useState({ installed: false, version: "", compatible: false, loading: true });
+  const [aiRuntime, setAiRuntime] = useState<any>({ installed: false, version: "", compatible: false, loading: true });
   const [aiRuntimeBusy, setAiRuntimeBusy] = useState(false);
   const [aiRuntimeProgress, setAiRuntimeProgress] = useState(null);
   const [aiRuntimeMessage, setAiRuntimeMessage] = useState("");
@@ -265,10 +265,10 @@ function AppSettings({ preferences, onChange, onBack, updateState, onCheckUpdate
             <section className="app-setting-section global-censorship-setting"><div><h2>브러쉬 설정 기본값</h2></div><div className="default-brush-grid">
               <div className="default-brush-row two-columns">
                 <label>방식<select value={preferences.censorship.method} onChange={(event) => onChange({ ...preferences, censorship: { ...preferences.censorship, method: event.target.value } })}><option value="solid">단색</option><option value="blur">블러</option><option value="mosaic">모자이크</option></select></label>
-                <label className="default-color-setting" onClick={(event) => { if (!event.target.closest(".brush-color-control")) event.preventDefault(); }}>색상<div className={`brush-color-control ${preferences.censorship.method !== "solid" ? "disabled" : ""}`}><span aria-hidden="true"><Palette size={17} /></span><input type="color" aria-label="기본 브러쉬 색상" disabled={preferences.censorship.method !== "solid"} value={preferences.censorship.color} onChange={(event) => onChange({ ...preferences, censorship: { ...preferences.censorship, color: event.target.value } })} /></div></label>
+                <label className="default-color-setting" onClick={(event) => { if (!(event.target as Element).closest(".brush-color-control")) event.preventDefault(); }}>색상<div className={`brush-color-control ${preferences.censorship.method !== "solid" ? "disabled" : ""}`}><span aria-hidden="true"><Palette size={17} /></span><input type="color" aria-label="기본 브러쉬 색상" disabled={preferences.censorship.method !== "solid"} value={preferences.censorship.color} onChange={(event) => onChange({ ...preferences, censorship: { ...preferences.censorship, color: event.target.value } })} /></div></label>
               </div>
               <div className="default-brush-row two-columns">
-                {[["size", "크기", 1, 240, "px"], ["hardness", "경도", 0, 100, "%"], ["opacity", "불투명도", 0, 100, "%"], ["dilation", "자동 검열 시 마스크 확장", 0, 100, "px"]].map(([key, label, min, max, unit]) => <label key={key}><span>{label}</span><div className="number-with-unit"><input type="number" min={min} max={max} value={preferences.censorship[key] || min} onChange={(event) => onChange({ ...preferences, censorship: { ...preferences.censorship, [key]: Math.max(min, Math.min(max, Number(event.target.value) || min)) } })} /><span>{unit}</span></div></label>)}
+                {[["size", "크기", 1, 240, "px"], ["hardness", "경도", 0, 100, "%"], ["opacity", "불투명도", 0, 100, "%"], ["dilation", "자동 검열 시 마스크 확장", 0, 100, "px"]].map(([key, label, min, max, unit]) => <label key={key}><span>{label}</span><div className="number-with-unit"><input type="number" min={min} max={max} value={preferences.censorship[key] || min} onChange={(event) => onChange({ ...preferences, censorship: { ...preferences.censorship, [key]: Math.max(Number(min), Math.min(Number(max), Number(event.target.value) || Number(min))) } })} /><span>{unit}</span></div></label>)}
               </div>
             </div></section>
             <section className="app-setting-section global-sticker-setting"><div><h2>스티커</h2></div><div className="global-sticker-management">

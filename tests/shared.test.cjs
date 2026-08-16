@@ -2,7 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 test("모든 태그 조합을 만들지 않고 프로젝트 저장 규칙과 경로를 비교한다", async () => {
-  const { matchesProjectPath } = await import("../src/renderer/shared.js");
+  const { matchesProjectPath } = await import("../src/renderer/shared.ts");
   const project = {
     pathTemplate: "{tag:character}/{tag:pose}.{extension}",
     tags: [
@@ -19,7 +19,7 @@ test("모든 태그 조합을 만들지 않고 프로젝트 저장 규칙과 경
 });
 
 test("빈 저장값을 선택 태그로 사용하고 최종 경로 충돌을 찾는다", async () => {
-  const { findPathRuleCollision, matchesProjectPath } = await import("../src/renderer/shared.js");
+  const { findPathRuleCollision, matchesProjectPath } = await import("../src/renderer/shared.ts");
   const project = {
     pathTemplate: "{tag:character}/{tag:partner}{tag:situation}.{extension}",
     tags: [

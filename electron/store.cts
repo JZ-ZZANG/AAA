@@ -17,6 +17,8 @@ function parseLorebookKeywords(value) {
 }
 
 class Store {
+  db: any;
+
   constructor(databasePath) {
     this.db = new DatabaseSync(databasePath);
     this.db.exec("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;");
@@ -669,7 +671,7 @@ class Store {
   }
 
   replaceProjectInventory(projectId, entries) {
-    const previous = new Map(this.listAssets(projectId).map((asset) => [logicalKey(asset.relativePath), asset]));
+    const previous = new Map<string, any>(this.listAssets(projectId).map((asset) => [logicalKey(asset.relativePath), asset]));
     this.db.exec("BEGIN IMMEDIATE");
     try {
       this.db.prepare("DELETE FROM assets WHERE project_id = ?").run(projectId);

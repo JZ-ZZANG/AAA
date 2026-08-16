@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { ClipboardCopy, Copy, GripVertical, LibraryBig, Plus, Save, Table2, Trash2, X } from "lucide-react";
-import { MarkdownTableDialog, findMarkdownTable, highlightLine } from "./Prompts.jsx";
-import { MarkdownEditor } from "../components/MarkdownEditor.jsx";
-import { TemplatePicker } from "../components/TemplatePicker.jsx";
-import { LorebookTemplateFolders } from "../components/LorebookTemplateFolders.jsx";
-import { DeleteConfirmModal } from "../components/Shell.jsx";
+import { MarkdownTableDialog, findMarkdownTable, highlightLine } from "./Prompts";
+import { MarkdownEditor } from "../components/MarkdownEditor";
+import { TemplatePicker } from "../components/TemplatePicker";
+import { LorebookTemplateFolders } from "../components/LorebookTemplateFolders";
+import { DeleteConfirmModal } from "../components/Shell";
 
 function LorebookKeywords({ entry, onChange }) {
   const [keywordInput, setKeywordInput] = useState("");

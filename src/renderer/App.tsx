@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Circle, Copy, Eraser, Home as HomeIcon, LayoutGrid, Minus, Paintbrush, RectangleHorizontal, RectangleVertical, RotateCcw, Settings as SettingsIcon, Square, Trash2, X } from "lucide-react";
-import { DEFAULT_SHORTCUTS, DEFAULT_CENSOR_SHORTCUTS, DEFAULT_CENSORSHIP, DEFAULT_STICKERS, normalizeProject, matchesShortcut, flushCensorEdits } from "./shared.js";
-import { WindowControls, Modal, DeleteConfirmModal, ProjectTitlebarNav } from "./components/Shell.jsx";
-import { Home } from "./pages/Home.jsx";
-import { AppSettings } from "./pages/AppSettings.jsx";
-import { ProjectPage } from "./pages/ProjectPage.jsx";
-import { TemplateSettings } from "./pages/TemplateSettings.jsx";
-import { GifMaker } from "./pages/GifMaker.jsx";
+import { DEFAULT_SHORTCUTS, DEFAULT_CENSOR_SHORTCUTS, DEFAULT_CENSORSHIP, DEFAULT_STICKERS, normalizeProject, matchesShortcut, flushCensorEdits } from "./shared";
+import { WindowControls, Modal, DeleteConfirmModal, ProjectTitlebarNav } from "./components/Shell";
+import { Home } from "./pages/Home";
+import { AppSettings } from "./pages/AppSettings";
+import { ProjectPage } from "./pages/ProjectPage";
+import { TemplateSettings } from "./pages/TemplateSettings";
+import { GifMaker } from "./pages/GifMaker";
 
 export default function App() {
   const [projects, setProjects] = useState([]);

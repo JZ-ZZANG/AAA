@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { ClipboardCopy, Copy, Eye, GripVertical, LibraryBig, Plus, Save, Table2, Trash2, X } from "lucide-react";
-import { MarkdownEditor } from "../components/MarkdownEditor.jsx";
-import { MarkdownPreviewModal } from "../components/MarkdownPreview.jsx";
-import { TemplatePicker } from "../components/TemplatePicker.jsx";
-import { EntryFolders } from "../components/LorebookTemplateFolders.jsx";
-import { DeleteConfirmModal } from "../components/Shell.jsx";
+import { MarkdownEditor } from "../components/MarkdownEditor";
+import { MarkdownPreviewModal } from "../components/MarkdownPreview";
+import { TemplatePicker } from "../components/TemplatePicker";
+import { EntryFolders } from "../components/LorebookTemplateFolders";
+import { DeleteConfirmModal } from "../components/Shell";
 
 function escapeHtml(value) {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
@@ -97,7 +97,7 @@ function MarkdownTableDialog({ initialTable, onClose, onInsert }) {
   }
 
   return <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-    <form className="modal markdown-table-modal" onSubmit={submit} onKeyDown={(event) => event.key === "Enter" && event.target.classList.contains("markdown-table-cell-input") && event.preventDefault()}>
+    <form className="modal markdown-table-modal" onSubmit={submit} onKeyDown={(event) => event.key === "Enter" && (event.target as HTMLElement).classList.contains("markdown-table-cell-input") && event.preventDefault()}>
       <div className="modal-heading"><h2>마크다운 표 {initialTable ? "편집" : "삽입"}</h2><button type="button" className="modal-close" aria-label="닫기" onClick={onClose}>×</button></div>
       <div className="markdown-table-options">
         <label>열 수<input type="number" min="1" max="99" value={columns} onChange={(event) => changeColumns(event.target.value)} /></label>
@@ -148,7 +148,7 @@ function Prompts({ project, kind = "prompt", api = null }) {
     setDraft(nextDraft);
   }
 
-  async function loadPrompts(preferredId) {
+  async function loadPrompts(preferredId = null) {
     const entries = await entryApi.list(project.id);
     setPrompts(entries);
     const nextId = preferredId || selectedId;

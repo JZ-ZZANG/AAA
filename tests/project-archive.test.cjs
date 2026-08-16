@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { createZip, readZip, safeArchiveName } = require("../electron/project-archive.cjs");
+const { createZip, readZip, safeArchiveName } = require("../electron-dist/project-archive.cjs");
 
 test("프로젝트 ZIP의 텍스트와 바이너리 파일을 그대로 복원한다", () => {
   const manifest = Buffer.from(JSON.stringify({ format: "aaa-project", version: 1 }), "utf8");

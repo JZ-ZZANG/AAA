@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { scanProjectInventory } = require("../electron/external-sync.cjs");
+const { scanProjectInventory } = require("../electron-dist/external-sync.cjs");
 
 test("선택한 확장자와 일치하는 외부 파일만 가져온다", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "aaa-sync-"));

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ElementType } from "react";
 import { ImageOff, X } from "lucide-react";
 
 function splitTableRow(line) {
@@ -104,7 +104,7 @@ function MarkdownPreview({ content, basePath = "" }) {
 
     const heading = /^\s{0,3}(#{1,6})\s+(.+)$/.exec(line);
     if (heading) {
-      const Heading = `h${heading[1].length}`;
+      const Heading = `h${heading[1].length}` as ElementType;
       blocks.push(<Heading key={`heading-${index}`}>{renderInline(heading[2], `heading-${index}`, basePath)}</Heading>);
       index += 1;
       continue;

@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const path = require("node:path");
-const { projectRoot, originAssetRoot, cleanedAssetRoot } = require("../electron/project-paths.cjs");
+const { projectRoot, originAssetRoot, cleanedAssetRoot } = require("../electron-dist/project-paths.cjs");
 
 test("프로젝트 내부의 에셋 폴더 경로를 일관되게 만든다", () => {
   const project = { savePath: path.join("D:", "test", "project1") };

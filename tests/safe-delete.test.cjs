@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { withStagedFileDeletion } = require("../electron/safe-delete.cjs");
+const { withStagedFileDeletion } = require("../electron-dist/safe-delete.cjs");
 
 test("DB 변경이 성공하면 준비된 파일을 최종 삭제한다", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "aaa-safe-delete-"));

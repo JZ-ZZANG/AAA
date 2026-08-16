@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { Store } = require("../electron/store.cjs");
+const { Store } = require("../electron-dist/store.cjs");
 
 test("프로젝트, 분류 기준, 규칙과 에셋 정보를 저장한다", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "aaa-store-"));

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { combinations, renderPath, withoutExtension } from "../shared.js";
+import { combinations, renderPath, withoutExtension } from "../shared";
 
 function Progress({ project, refreshVersion }) {
   const [assets, setAssets] = useState([]);
@@ -16,7 +16,7 @@ function Progress({ project, refreshVersion }) {
     const pathSegments = project.pathTemplate.split(/[\\/]/);
     const firstFolderTemplate = pathSegments.length > 1 ? pathSegments[0] : "";
     const primaryTags = project.tags.filter((tag) => firstFolderTemplate.includes(`{tag:${tag.id}}`));
-    const assetByPath = new Map();
+    const assetByPath = new Map<string, any>();
     assets.forEach((asset) => {
       const key = withoutExtension(asset.relativePath);
       const current = assetByPath.get(key);
@@ -31,7 +31,7 @@ function Progress({ project, refreshVersion }) {
     const groups = primaryTags.length ? combinations(primaryTags).map((row) => ({ name: row.labels.join(" · "), selections: row.selections, valueId: Object.values(row.selections).join(":") })) : [{ name: project.name, selections: {}, valueId: null }];
     const results = groups.map((group) => {
       const rows = allRows.filter((row) => Object.entries(group.selections).every(([tagId, valueId]) => row.selections[tagId] === valueId));
-      const uniqueRows = [...new Map(rows.map((row) => [row.key, row])).values()];
+      const uniqueRows: any[] = [...new Map<string, any>(rows.map((row) => [row.key, row])).values()];
       const incomplete = uniqueRows.flatMap((row) => {
         const asset = assetByPath.get(row.key);
         if (!asset) return [{ ...row, state: "unclassified" }];

@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { Store } = require("../electron/store.cjs");
+const { Store } = require("../electron-dist/store.cjs");
 
 test("global backup restore appends settings data without changing projects", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "aaa-global-backup-"));
