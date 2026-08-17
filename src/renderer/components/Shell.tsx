@@ -2,8 +2,37 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Circle, Copy, Eraser, Home as HomeIcon, LayoutGrid, Minus, Paintbrush, RectangleHorizontal, RectangleVertical, RotateCcw, Settings as SettingsIcon, Square, Trash2, X } from "lucide-react";
 import { EXTENSIONS, ORIGINAL_EXTENSION, TRACKED_EXTENSIONS, shortcutFromEvent, wheelShortcutFromEvent } from "../shared";
 
-function ShortcutInput({ value, onChange, allowWheel = false }) {
-  return <input readOnly value={value} onKeyDown={(event) => { event.preventDefault(); const shortcut = shortcutFromEvent(event); if (shortcut) onChange(shortcut); }} onWheel={allowWheel ? (event) => { event.preventDefault(); onChange(wheelShortcutFromEvent(event)); } : undefined} />;
+function displayedShortcut(value) {
+  return String(value || "").replaceAll("WheelUp", "Wheel↑").replaceAll("WheelDown", "Wheel↓");
+}
+
+function ShortcutInput({ value, onChange, allowWheel = false, ariaLabel = "단축키" }) {
+  const [capturing, setCapturing] = useState(false);
+  return <input
+    className={capturing ? "shortcut-input-capturing" : ""}
+    aria-label={ariaLabel}
+    readOnly
+    value={capturing ? "입력 대기..." : displayedShortcut(value)}
+    onClick={(event) => { setCapturing(true); event.currentTarget.select(); }}
+    onBlur={() => setCapturing(false)}
+    onKeyDown={(event) => {
+      if (!capturing) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.key === "Escape") { setCapturing(false); return; }
+      const shortcut = shortcutFromEvent(event);
+      if (!shortcut) return;
+      onChange(shortcut);
+      setCapturing(false);
+    }}
+    onWheel={allowWheel ? (event) => {
+      if (!capturing) return;
+      event.preventDefault();
+      event.stopPropagation();
+      onChange(wheelShortcutFromEvent(event));
+      setCapturing(false);
+    } : undefined}
+  />;
 }
 
 function WindowControls() {

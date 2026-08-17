@@ -40,6 +40,15 @@ function updateStatusText(updateState) {
   return "최신 버전입니다";
 }
 
+function aiRuntimeStatusText(aiRuntime, checking) {
+  if (aiRuntime.loading) return "버전 확인 중...";
+  if (checking) return "업데이트 확인 중...";
+  if (!aiRuntime.installed) return "설치되지 않았습니다";
+  if (!aiRuntime.compatible) return "현재 AAA 버전과 호환되지 않습니다";
+  if (aiRuntime.updateAvailable) return "업데이트가 있습니다";
+  return "최신 버전입니다";
+}
+
 function mergeRestoredPreferences(current, incoming) {
   const source = incoming && typeof incoming === "object" && !Array.isArray(incoming) ? incoming : {};
   const next = { ...current };
@@ -150,7 +159,6 @@ function AppSettings({ preferences, onChange, onBack, updateState, onCheckUpdate
     try {
       const status = await window.aaa.aiRuntime.check();
       setAiRuntime({ ...status, loading: false });
-      setAiRuntimeMessage(status.updateAvailable ? "업데이트가 있습니다" : "최신 버전입니다");
     } catch (error) { setAiRuntimeMessage(error.message); }
     finally { setAiRuntimeBusy(false); }
   };
@@ -233,14 +241,14 @@ function AppSettings({ preferences, onChange, onBack, updateState, onCheckUpdate
   const setShortcut = (scope, key, value) => {
     const current = preferences[scope];
     const next = { ...current };
-    const conflict = Object.keys(current).find((item) => item !== key && item !== "lineModifier" && current[item].toLowerCase() === value.toLowerCase());
+    const conflict = Object.keys(current).find((item) => item !== key && current[item].toLowerCase() === value.toLowerCase());
     if (conflict) next[conflict] = current[key];
     next[key] = value;
     onChange({ ...preferences, [scope]: next });
   };
 
   const tabShortcuts = [["home", "홈"], ["management", "관리"], ["work", "작품"], ["prompts", "프롬프트"], ["lorebook", "로어북"], ["situation", "시작 상황"], ["classification", "에셋 분류"], ["censorship", "에셋 검열"], ["export", "내보내기"], ["settings", "설정"]];
-  const censorShortcuts = [["previous", "이전 이미지"], ["manualToggle", "수동 확인 / 대기"], ["next", "다음 이미지"], ["originalPreview", "원본 보기 (홀드)"], ["brushEraserToggle", "브러시 / 지우개"], ["methodCycle", "단색 / 블러 / 모자이크"], ["shapeToggle", "원형 / 사각형"], ["sidebarToggle", "사이드바 열기 / 닫기"], ["undo", "작업 취소"], ["redo", "다시 실행"], ["brushIncrease", "브러시 크기 증가"], ["brushDecrease", "브러시 크기 감소"], ["hardnessIncrease", "경도 증가"], ["hardnessDecrease", "경도 감소"], ["opacityIncrease", "불투명도 증가"], ["opacityDecrease", "불투명도 감소"], ["zoomIncrease", "화면 확대"], ["zoomDecrease", "화면 축소"]];
+  const censorShortcuts = [["previous", "이전 이미지"], ["next", "다음 이미지"], ["manualToggle", "수동 확인 / 대기"], ["originalPreview", "원본 보기 (홀드)"], ["brushEraserToggle", "브러시 / 지우개"], ["methodCycle", "단색 / 블러 / 모자이크"], ["shapeToggle", "원형 / 사각형"], ["sidebarToggle", "사이드바 열기 / 닫기"], ["undo", "작업 취소"], ["redo", "다시 실행"], ["brushIncrease", "브러시 크기 증가"], ["brushDecrease", "브러시 크기 감소"], ["hardnessIncrease", "경도 증가"], ["hardnessDecrease", "경도 감소"], ["opacityIncrease", "불투명도 증가"], ["opacityDecrease", "불투명도 감소"], ["zoomIncrease", "화면 확대"], ["zoomDecrease", "화면 축소"]];
 
   return <div className="modal-backdrop settings-modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onBack()}>
     <section className="app-settings-modal">
@@ -291,8 +299,13 @@ function AppSettings({ preferences, onChange, onBack, updateState, onCheckUpdate
           </>}
 
           {activeTab === "shortcuts" && <>
-            <section className="app-setting-section shortcut-section"><div><h2>탭 이동</h2></div><div className="shortcut-group"><div className="shortcut-grid">{tabShortcuts.map(([key, label]) => <label key={key}><span>{label}</span><ShortcutInput value={preferences.shortcuts[key]} onChange={(value) => setShortcut("shortcuts", key, value)} /></label>)}</div></div></section>
-            <section className="app-setting-section shortcut-section"><div><h2>에셋 검열</h2></div><div className="shortcut-group"><div className="shortcut-grid censorship-shortcut-grid">{censorShortcuts.map(([key, label]) => <label key={key}><span>{label}</span><ShortcutInput allowWheel value={preferences.censorShortcuts[key]} onChange={(value) => setShortcut("censorShortcuts", key, value)} /></label>)}<label><span>영역 그리기</span><span className="click-shortcut"><b>Ctrl + 드래그</b></span></label><label><span>정비율 영역</span><span className="click-shortcut"><b>Shift + 드래그</b></span></label><label><span>직선 긋기</span><span className="click-shortcut"><select value={preferences.censorShortcuts.lineModifier} onChange={(event) => setShortcut("censorShortcuts", "lineModifier", event.target.value)}><option value="disabled">사용 안 함</option><option value="shift">Shift</option><option value="alt">Alt</option></select><b>+ 클릭</b></span></label></div></div></section>
+            <section className="app-setting-section shortcut-section"><div><h2>탭 이동</h2></div><div className="shortcut-group"><div className="shortcut-grid">{tabShortcuts.map(([key, label]) => <div className="shortcut-row" key={key}><span>{label}</span><ShortcutInput ariaLabel={`${label} 단축키`} value={preferences.shortcuts[key]} onChange={(value) => setShortcut("shortcuts", key, value)} /></div>)}</div></div></section>
+            <section className="app-setting-section shortcut-section"><div><h2>에셋 검열</h2></div><div className="shortcut-group"><div className="shortcut-grid censorship-shortcut-grid">
+              {censorShortcuts.map(([key, label]) => <div className="shortcut-row" key={key}><span>{label}</span><ShortcutInput ariaLabel={`${label} 단축키`} allowWheel value={preferences.censorShortcuts[key]} onChange={(value) => setShortcut("censorShortcuts", key, value)} /></div>)}
+              <div className="shortcut-row"><span>영역 그리기</span><input className="fixed-shortcut-input" aria-label="영역 그리기 고정 단축키" readOnly tabIndex={-1} value="Ctrl+드래그" /></div>
+              <div className="shortcut-row"><span>정비율 영역</span><input className="fixed-shortcut-input" aria-label="정비율 영역 고정 단축키" readOnly tabIndex={-1} value="Ctrl+Shift+드래그" /></div>
+              <div className="shortcut-row"><span>직선 긋기</span><input className="fixed-shortcut-input" aria-label="직선 긋기 고정 단축키" readOnly tabIndex={-1} value="Shift+클릭" /></div>
+            </div></div></section>
             <footer className="settings-tab-footer"><button className="outline-button shortcut-reset" onClick={() => onChange({ ...preferences, shortcuts: { ...DEFAULT_SHORTCUTS }, censorShortcuts: { ...DEFAULT_CENSOR_SHORTCUTS } })}>단축키 초기화</button></footer>
           </>}
 
@@ -317,7 +330,7 @@ function AppSettings({ preferences, onChange, onBack, updateState, onCheckUpdate
                   <div className="app-info-version-card"><div className="app-info-package-heading"><div><strong>AAA</strong><span>버전 {updateState.currentVersion || "0.1.0"}</span></div><button className={updateState.status === "available" ? "update-available" : ""} disabled={["checking", "downloading", "installing"].includes(updateState.status)} onClick={() => (updateState.status === "available" ? onInstallUpdate() : onCheckUpdate()).catch(() => {})}>{updateState.status === "available" ? "업데이트" : updateState.status === "checking" ? "확인 중..." : "버전 체크"}</button></div><p>{updateStatusText(updateState)}</p></div>
                   <div className="app-info-ai-card">
                     <div className="app-info-package-heading"><div><strong>AI 검열 패키지</strong><span>{aiRuntime.loading ? "버전 확인 중" : aiRuntime.installed ? `버전 ${aiRuntime.version}` : "버전 -"}</span></div><div className="app-info-install-action" ref={aiInstallMenuRef}><button className={aiRuntime.updateAvailable || (aiRuntime.installed && !aiRuntime.compatible) ? "update-available" : ""} type="button" aria-expanded={!aiRuntime.installed ? aiInstallMenuOpen : undefined} disabled={aiRuntimeBusy || aiRuntime.loading} onClick={() => { if (!aiRuntime.installed) setAiInstallMenuOpen((current) => !current); else runAiRuntimeAction().catch(() => {}); }}>{aiRuntimeBusy ? aiRuntimeProgress ? "설치 중..." : "확인 중..." : !aiRuntime.installed ? "설치" : aiRuntime.updateAvailable || !aiRuntime.compatible ? "업데이트" : "버전 체크"}</button>{!aiRuntime.installed && aiInstallMenuOpen && <div className="ai-install-options"><button type="button" onClick={() => installAiRuntime(false)}>자동 설치</button><button type="button" onClick={() => installAiRuntime(true)}>수동 설치</button></div>}</div></div>
-                    <p>{aiRuntime.loading ? "확인 중" : !aiRuntime.installed ? "설치되지 않음" : !aiRuntime.compatible ? "현재 AAA 버전과 호환되지 않습니다." : "설치되어 있습니다."}</p>
+                    <p>{aiRuntimeStatusText(aiRuntime, aiRuntimeBusy && !aiRuntimeProgress)}</p>
                     {!aiRuntime.loading && aiRuntime.latestVersion && aiRuntime.updateAvailable && <p>최신 버전 {aiRuntime.latestVersion}{aiRuntime.downloadSize ? ` · ${formattedBytes(aiRuntime.downloadSize)}` : ""}</p>}
                     {aiRuntimeProgress && <div className="ai-runtime-progress"><div><span style={{ width: `${aiRuntimeProgress.percent || 0}%` }} /></div><p>{aiRuntimeProgress.message}{aiRuntimeProgress.stage === "downloading" && aiRuntimeProgress.percent ? ` · ${aiRuntimeProgress.percent}%` : ""}</p></div>}
                     <p className={`ai-runtime-message ${aiRuntimeMessage.includes("실패") || aiRuntimeMessage.includes("못했") || aiRuntimeMessage.includes("않습니다") ? "error" : ""}`}>{aiRuntimeMessage}</p>

@@ -1,6 +1,6 @@
-import { Clapperboard, LibraryBig, Trash2 } from "lucide-react";
+import { Clapperboard, LibraryBig, ShieldCheck, Trash2 } from "lucide-react";
 
-function Home({ projects, loading, onCreate, onOpen, onDelete, onTemplates, onGifMaker }) {
+function Home({ projects, loading, onCreate, onOpen, onDelete, onTemplates, onGifMaker, onStandaloneAi }) {
   return (
     <main className="page home-page">
       <section className="home-section home-project-section">
@@ -38,6 +38,7 @@ function Home({ projects, loading, onCreate, onOpen, onDelete, onTemplates, onGi
         <div className="home-tool-list">
           <button className="home-tool-card" onClick={onTemplates}><LibraryBig size={25} /><strong>템플릿 설정</strong></button>
           <button className="home-tool-card" onClick={onGifMaker}><Clapperboard size={25} /><strong>움짤 생성</strong></button>
+          {/* <button className="home-tool-card" onClick={onStandaloneAi}><ShieldCheck size={25} /><strong>에셋 AI 검열</strong></button> */}
         </div>
       </section>
     </main>

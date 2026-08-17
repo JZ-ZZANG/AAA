@@ -171,7 +171,7 @@ async function runWorker(jobPath, onMessage, signal, workerPath = "") {
   }
 }
 
-async function runAiCensorship({ project, assets, settings, onProgress, onResult, signal, workerPath = "" }) {
+async function runAiCensorship({ project, assets, settings, onProgress, onResult, signal, workerPath = "", resolveOutputPath = null }) {
   throwIfCancelled(signal);
   const allowedTargets = new Set(["nipple", "vulva", "anus", "penis", "testicles", "x_ray", "cross_section"]);
   const targets = [...new Set(Array.isArray(settings.targets) ? settings.targets.filter((target) => allowedTargets.has(target)) : [])];
@@ -202,7 +202,7 @@ async function runAiCensorship({ project, assets, settings, onProgress, onResult
       const result = results.get(index);
       try {
         if (!result || result.error) throw new Error(result?.error || "모델 결과를 받지 못했습니다.");
-        const outputPath = outputPathFor(project, asset);
+        const outputPath = resolveOutputPath ? resolveOutputPath(asset) : outputPathFor(project, asset);
         await renderCensoredAsset(asset.savedPath, outputPath, result.detections, settings);
         throwIfCancelled(signal);
         await onResult(asset, "auto", outputPath, "", result.detections.length);

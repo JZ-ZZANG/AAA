@@ -624,7 +624,7 @@ function ManualCensorEditor({ asset, project, editorSettings, onEditorSettingsCh
     strokeStamp.current = brushStamp();
     prepareStrokeEffect();
     const current = point(event);
-    const lineModifierActive = shortcuts.lineModifier !== "disabled" && event[`${shortcuts.lineModifier}Key`];
+    const lineModifierActive = event.shiftKey;
     if (lineModifierActive && lastAnchor.current) { const distance = Math.hypot(current.x - lastAnchor.current.x, current.y - lastAnchor.current.y); const spacing = Math.max(1, size * .12); const steps = Math.max(1, Math.ceil(distance / spacing)); for (let index = 1; index <= steps; index += 1) dab(lastAnchor.current.x + (current.x - lastAnchor.current.x) * index / steps, lastAnchor.current.y + (current.y - lastAnchor.current.y) * index / steps); }
     else dab(current.x, current.y);
     lastPoint.current = current;

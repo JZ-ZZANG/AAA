@@ -12,6 +12,7 @@ const { originAssetRoot, cleanedAssetRoot } = require("./project-paths.cjs");
 const { createZip, readArchive, safeArchiveName } = require("./project-archive.cjs");
 const { addStickers, deleteSticker, listStickers, stickerPath } = require("./stickers.cjs");
 const { AiRuntimeManager } = require("./ai-runtime.cjs");
+const { validatedImage, standaloneAssetsFromFiles, scanStandaloneFolder, standaloneOutputPath } = require("./standalone-ai-censorship.cjs");
 const crypto = require("node:crypto");
 const sharp = require("sharp");
 let electronAutoUpdater = null;
@@ -666,6 +667,18 @@ function registerIpc() {
     const result = await dialog.showOpenDialog({ properties: ["openFile"], filters: [{ name: "PyTorch 모델", extensions: ["pt"] }] });
     return result.canceled ? null : result.filePaths[0];
   });
+  ipcMain.handle("standalone-ai:choose-files", async (event) => {
+    const result = await dialog.showOpenDialog(BrowserWindow.fromWebContents(event.sender), { properties: ["openFile", "multiSelections"], filters: [{ name: "이미지", extensions: ["png", "jpg", "jpeg", "webp", "avif", "gif", "bmp"] }] });
+    if (result.canceled) return null;
+    const assets = await standaloneAssetsFromFiles(result.filePaths);
+    return { sourceLabel: assets.length === 1 ? assets[0].savedPath : `${path.dirname(assets[0].savedPath)} 외`, files: assets.map(({ savedPath, relativePath, fileSize }) => ({ sourcePath: savedPath, relativePath, fileSize })) };
+  });
+  ipcMain.handle("standalone-ai:choose-folder", async (event) => {
+    const result = await dialog.showOpenDialog(BrowserWindow.fromWebContents(event.sender), { properties: ["openDirectory"] });
+    if (result.canceled) return null;
+    const selected = await scanStandaloneFolder(result.filePaths[0]);
+    return { sourceLabel: selected.rootPath, files: selected.assets.map(({ savedPath, relativePath, fileSize }) => ({ sourcePath: savedPath, relativePath, fileSize })) };
+  });
   ipcMain.handle("ai-runtime:status", () => aiRuntime.installed());
   ipcMain.handle("ai-runtime:check", () => aiRuntime.latest());
   ipcMain.handle("ai-runtime:consume-install-request", () => aiRuntime.consumeInstallRequest());
@@ -1036,6 +1049,73 @@ function registerIpc() {
   });
   ipcMain.handle("assets:list", (_event, projectId) => store.listAssets(requiredText(projectId, "프로젝트 ID")));
   ipcMain.handle("assets:ai-logs", () => aiCensorshipLogs.map((entry) => ({ ...entry })));
+  ipcMain.handle("standalone-ai:run", async (event, input) => {
+    if (activeAiCensorshipPromise) throw new Error("이미 AI 검열 작업이 실행 중입니다.");
+    const packagedWorkerPath = app.isPackaged ? aiRuntime.installedWorkerPath() : "";
+    if (app.isPackaged && !packagedWorkerPath) throw new Error("AI 검열 기능이 설치되어 있지 않거나 현재 버전과 호환되지 않습니다.");
+    const requestedFiles = Array.isArray(input?.files) ? input.files : [];
+    if (!requestedFiles.length) throw new Error("작업할 이미지를 선택해 주세요.");
+    if (requestedFiles.length > 10000) throw new Error("한 번에 최대 10,000개의 이미지를 처리할 수 있습니다.");
+    const assets = await Promise.all(requestedFiles.map((item) => validatedImage(item?.sourcePath, item?.relativePath)));
+    const outputRoot = path.resolve(requiredText(input?.outputPath, "출력 폴더"));
+    const outputStats = await statsOrNull(outputRoot);
+    if (!outputStats?.isDirectory()) throw new Error("사용할 수 있는 출력 폴더를 선택해 주세요.");
+    const outputExtension = input?.outputExtension === "original" ? "original" : String(input?.outputExtension || "").toLowerCase();
+    const overwrite = input?.overwrite === true;
+    const outputPaths = new Map();
+    const seenOutputs = new Set();
+    for (const asset of assets) {
+      const outputPath = standaloneOutputPath(outputRoot, asset, outputExtension);
+      const outputKey = process.platform === "win32" ? outputPath.toLocaleLowerCase() : outputPath;
+      const sourceKey = process.platform === "win32" ? asset.savedPath.toLocaleLowerCase() : asset.savedPath;
+      if (outputKey === sourceKey) throw new Error("원본 파일과 출력 파일의 경로가 같습니다. 다른 출력 폴더를 선택해 주세요.");
+      if (seenOutputs.has(outputKey)) throw new Error(`출력 파일 이름이 중복됩니다: ${asset.relativePath}`);
+      if (!overwrite && await statsOrNull(outputPath)) throw new Error(`출력 폴더에 같은 이름의 파일이 있습니다: ${path.basename(outputPath)}`);
+      seenOutputs.add(outputKey);
+      outputPaths.set(asset.id, outputPath);
+    }
+    const settings = input?.settings && typeof input.settings === "object" ? input.settings : {};
+    appendAiCensorshipLog("info", `독립 작업 시작 · 이미지 ${assets.length}개 · 모델 ${path.basename(String(settings.modelPath || "")) || "미지정"}`);
+    const controller = new AbortController();
+    activeAiCensorshipController = controller;
+    const details = [];
+    const task = runAiCensorship({
+      assets,
+      settings,
+      workerPath: packagedWorkerPath,
+      resolveOutputPath: (asset) => outputPaths.get(asset.id),
+      onProgress: (progress) => {
+        if (progress.stage === "detecting" && progress.completed === 0) appendAiCensorshipLog("info", progress.message);
+        if (!event.sender.isDestroyed()) event.sender.send("standalone-ai:progress", progress);
+      },
+      onResult: (asset, status, outputPath, errorMessage, detectionCount = 0) => {
+        details.push({ relativePath: asset.relativePath, status, outputPath: outputPath || "", error: errorMessage || "", detectionCount });
+        if (status === "failed") appendAiCensorshipLog("error", `실패 · ${asset.relativePath} · ${errorMessage || "원인을 확인할 수 없습니다."}`);
+        else if (detectionCount === 0) appendAiCensorshipLog("info", `대상 없음 · ${asset.relativePath}`);
+        else appendAiCensorshipLog("success", `완료 · ${asset.relativePath} · 마스크 ${detectionCount}개`);
+      },
+      signal: controller.signal
+    });
+    activeAiCensorshipPromise = task;
+    try {
+      const result = await task;
+      appendAiCensorshipLog(result.failed ? "warning" : "success", `독립 작업 완료 · 성공 ${result.succeeded}개 · 실패 ${result.failed}개`);
+      return { ...result, details, outputPath: outputRoot };
+    } catch (error) {
+      appendAiCensorshipLog(error.code === "ABORT_ERR" ? "warning" : "error", `${error.code === "ABORT_ERR" ? "독립 작업 취소" : "독립 작업 중단"} · ${error.message}`);
+      throw error;
+    } finally {
+      if (activeAiCensorshipPromise === task) activeAiCensorshipPromise = null;
+      if (activeAiCensorshipController === controller) activeAiCensorshipController = null;
+    }
+  });
+  ipcMain.handle("standalone-ai:cancel", async () => {
+    if (!activeAiCensorshipPromise || !activeAiCensorshipController) return false;
+    appendAiCensorshipLog("warning", "독립 작업 취소 요청");
+    activeAiCensorshipController.abort();
+    await Promise.race([activeAiCensorshipPromise.catch(() => {}), new Promise((resolve) => setTimeout(resolve, 5000))]);
+    return true;
+  });
   ipcMain.handle("assets:ai-censor", async (event, input) => {
     if (activeAiCensorshipPromise) throw new Error("이미 AI 검열 작업이 실행 중입니다.");
     const packagedWorkerPath = app.isPackaged ? aiRuntime.installedWorkerPath() : "";

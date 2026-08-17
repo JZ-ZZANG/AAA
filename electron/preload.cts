@@ -169,6 +169,17 @@ contextBridge.exposeInMainWorld("aaa", {
     url: (assetId, original = false) => ipcRenderer.invoke("assets:url", assetId, original),
     classify: (input) => ipcRenderer.invoke("assets:classify", input)
   },
+  standaloneAi: {
+    chooseFiles: () => ipcRenderer.invoke("standalone-ai:choose-files"),
+    chooseFolder: () => ipcRenderer.invoke("standalone-ai:choose-folder"),
+    run: (input) => ipcRenderer.invoke("standalone-ai:run", input),
+    cancel: () => ipcRenderer.invoke("standalone-ai:cancel"),
+    onProgress: (callback) => {
+      const listener = (_event, progress) => callback(progress);
+      ipcRenderer.on("standalone-ai:progress", listener);
+      return () => ipcRenderer.removeListener("standalone-ai:progress", listener);
+    }
+  },
   works: {
     get: (projectId) => ipcRenderer.invoke("works:get", projectId),
     save: (input) => ipcRenderer.invoke("works:save", input),

@@ -13,7 +13,7 @@ const DEFAULT_SHORTCUTS = {
   export: "F9",
   settings: "F12"
 };
-const DEFAULT_CENSOR_SHORTCUTS = { previous: "Z", manualToggle: "X", next: "C", originalPreview: "Q", brushEraserToggle: "A", methodCycle: "S", shapeToggle: "D", sidebarToggle: "/", undo: "Ctrl+Z", redo: "Ctrl+Y", brushIncrease: "WheelUp", brushDecrease: "WheelDown", hardnessIncrease: "Ctrl+WheelUp", hardnessDecrease: "Ctrl+WheelDown", opacityIncrease: "Shift+WheelUp", opacityDecrease: "Shift+WheelDown", zoomIncrease: "Alt+WheelUp", zoomDecrease: "Alt+WheelDown", lineModifier: "shift" };
+const DEFAULT_CENSOR_SHORTCUTS = { previous: "Z", manualToggle: "X", next: "C", originalPreview: "Q", brushEraserToggle: "A", methodCycle: "S", shapeToggle: "D", sidebarToggle: "/", undo: "Ctrl+Z", redo: "Ctrl+Y", brushIncrease: "WheelUp", brushDecrease: "WheelDown", hardnessIncrease: "Ctrl+WheelUp", hardnessDecrease: "Ctrl+WheelDown", opacityIncrease: "Shift+WheelUp", opacityDecrease: "Shift+WheelDown", zoomIncrease: "Alt+WheelUp", zoomDecrease: "Alt+WheelDown" };
 const CENSOR_TARGET_OPTIONS: Array<[string, string]> = [["nipple", "유두"], ["vulva", "여성기"], ["anus", "항문"], ["penis", "남성기"], ["testicles", "고환"], ["x_ray", "엑스레이"], ["cross_section", "단면"]];
 const DEFAULT_CENSORSHIP = { targets: CENSOR_TARGET_OPTIONS.map(([value]) => value), confidence: 50, imageSize: 1024, dilation: 8, method: "solid", shape: "circle", color: "#ffffff", size: 48, hardness: 80, opacity: 100, modelPath: "" };
 const DEFAULT_STICKERS = { favoriteEmojiIds: [] };
