@@ -12,7 +12,7 @@ const { originAssetRoot, cleanedAssetRoot } = require("./project-paths.cjs");
 const { createZip, readArchive, safeArchiveName } = require("./project-archive.cjs");
 const { addStickers, deleteSticker, listStickers, stickerPath } = require("./stickers.cjs");
 const { AiRuntimeManager } = require("./ai-runtime.cjs");
-const { validatedImage, standaloneAssetsFromFiles, scanStandaloneFolder, standaloneOutputPath } = require("./standalone-ai-censorship.cjs");
+const { validatedImage, standaloneAssetsFromFiles, scanStandaloneFolder, planStandaloneOutputs } = require("./standalone-ai-censorship.cjs");
 const crypto = require("node:crypto");
 const sharp = require("sharp");
 let electronAutoUpdater = null;
@@ -382,7 +382,8 @@ async function restoreProjectArchive(archivePath, parentPathValue) {
   };
   let createdProject = null;
   try {
-    await Promise.all([fs.promises.mkdir(originAssetRoot({ savePath }), { recursive: true }), fs.promises.mkdir(cleanedAssetRoot({ savePath }), { recursive: true })]);
+    await fs.promises.mkdir(originAssetRoot({ savePath }), { recursive: true });
+    if (manifest.project.censorshipConfig?.enabled === true) await fs.promises.mkdir(cleanedAssetRoot({ savePath }), { recursive: true });
     const tagIds = new Map();
     const tags = (Array.isArray(manifest.project.tags) ? manifest.project.tags : []).map((tag) => {
       const id = crypto.randomUUID(); tagIds.set(tag.id, id);
@@ -824,25 +825,21 @@ function registerIpc() {
     const savePath = path.join(parentPath, name);
     const existing = await statsOrNull(savePath);
     if (existing && (!existing.isDirectory() || (await fs.promises.readdir(savePath)).length)) throw new Error("같은 이름의 비어 있지 않은 폴더가 이미 있습니다.");
-    await fs.promises.mkdir(savePath, { recursive: true });
-    await Promise.all([
-      fs.promises.mkdir(originAssetRoot({ savePath }), { recursive: true }),
-      fs.promises.mkdir(cleanedAssetRoot({ savePath }), { recursive: true })
-    ]);
     const censorshipConfig = {
       enabled: input?.censorshipEnabled === true,
       outputPath: "",
       outputExtension: PROJECT_EXTENSIONS.has(input?.censorshipExtension) ? input.censorshipExtension : ".png"
     };
+    await fs.promises.mkdir(savePath, { recursive: true });
+    await fs.promises.mkdir(originAssetRoot({ savePath }), { recursive: true });
+    if (censorshipConfig.enabled) await fs.promises.mkdir(cleanedAssetRoot({ savePath }), { recursive: true });
     return store.createProject({ name, savePath, censorshipConfig });
   });
   ipcMain.handle("projects:delete", (_event, id) => store.deleteProject(requiredText(id, "프로젝트 ID")));
   ipcMain.handle("projects:save", async (_event, input) => {
     const validated = validateProjectConfig(input);
-    await Promise.all([
-      fs.promises.mkdir(originAssetRoot(validated), { recursive: true }),
-      fs.promises.mkdir(cleanedAssetRoot(validated), { recursive: true })
-    ]);
+    await fs.promises.mkdir(originAssetRoot(validated), { recursive: true });
+    if (validated.censorshipConfig.enabled) await fs.promises.mkdir(cleanedAssetRoot(validated), { recursive: true });
     const project = store.saveProject(validated);
     return store.getProject(project.id);
   });
@@ -1056,29 +1053,23 @@ function registerIpc() {
     const requestedFiles = Array.isArray(input?.files) ? input.files : [];
     if (!requestedFiles.length) throw new Error("작업할 이미지를 선택해 주세요.");
     if (requestedFiles.length > 10000) throw new Error("한 번에 최대 10,000개의 이미지를 처리할 수 있습니다.");
-    const assets = await Promise.all(requestedFiles.map((item) => validatedImage(item?.sourcePath, item?.relativePath)));
+    const requestedAssets = await Promise.all(requestedFiles.map((item) => validatedImage(item?.sourcePath, item?.relativePath)));
     const outputRoot = path.resolve(requiredText(input?.outputPath, "출력 폴더"));
     const outputStats = await statsOrNull(outputRoot);
     if (!outputStats?.isDirectory()) throw new Error("사용할 수 있는 출력 폴더를 선택해 주세요.");
     const outputExtension = input?.outputExtension === "original" ? "original" : String(input?.outputExtension || "").toLowerCase();
-    const overwrite = input?.overwrite === true;
-    const outputPaths = new Map();
-    const seenOutputs = new Set();
-    for (const asset of assets) {
-      const outputPath = standaloneOutputPath(outputRoot, asset, outputExtension);
-      const outputKey = process.platform === "win32" ? outputPath.toLocaleLowerCase() : outputPath;
-      const sourceKey = process.platform === "win32" ? asset.savedPath.toLocaleLowerCase() : asset.savedPath;
-      if (outputKey === sourceKey) throw new Error("원본 파일과 출력 파일의 경로가 같습니다. 다른 출력 폴더를 선택해 주세요.");
-      if (seenOutputs.has(outputKey)) throw new Error(`출력 파일 이름이 중복됩니다: ${asset.relativePath}`);
-      if (!overwrite && await statsOrNull(outputPath)) throw new Error(`출력 폴더에 같은 이름의 파일이 있습니다: ${path.basename(outputPath)}`);
-      seenOutputs.add(outputKey);
-      outputPaths.set(asset.id, outputPath);
-    }
+    const planned = await planStandaloneOutputs(outputRoot, requestedAssets, outputExtension, input?.conflictPolicy);
+    const { assets, outputPaths, skipped } = planned;
     const settings = input?.settings && typeof input.settings === "object" ? input.settings : {};
-    appendAiCensorshipLog("info", `독립 작업 시작 · 이미지 ${assets.length}개 · 모델 ${path.basename(String(settings.modelPath || "")) || "미지정"}`);
+    const details = skipped.map(({ asset, outputPath }) => ({ relativePath: asset.relativePath, status: "skipped", outputPath, error: "같은 이름의 파일이 있어 건너뛰었습니다.", detectionCount: 0 }));
+    skipped.forEach(({ asset }) => appendAiCensorshipLog("info", `건너뜀 · ${asset.relativePath} · 같은 이름의 파일 존재`));
+    if (!assets.length) {
+      appendAiCensorshipLog("info", `독립 작업 완료 · 건너뜀 ${skipped.length}개`);
+      return { total: requestedAssets.length, succeeded: 0, failed: 0, skipped: skipped.length, details, outputPath: outputRoot };
+    }
+    appendAiCensorshipLog("info", `독립 작업 시작 · 이미지 ${assets.length}개${skipped.length ? ` · 건너뜀 ${skipped.length}개` : ""} · 모델 ${path.basename(String(settings.modelPath || "")) || "미지정"}`);
     const controller = new AbortController();
     activeAiCensorshipController = controller;
-    const details = [];
     const task = runAiCensorship({
       assets,
       settings,
@@ -1099,8 +1090,8 @@ function registerIpc() {
     activeAiCensorshipPromise = task;
     try {
       const result = await task;
-      appendAiCensorshipLog(result.failed ? "warning" : "success", `독립 작업 완료 · 성공 ${result.succeeded}개 · 실패 ${result.failed}개`);
-      return { ...result, details, outputPath: outputRoot };
+      appendAiCensorshipLog(result.failed ? "warning" : "success", `독립 작업 완료 · 성공 ${result.succeeded}개 · 실패 ${result.failed}개${skipped.length ? ` · 건너뜀 ${skipped.length}개` : ""}`);
+      return { ...result, total: requestedAssets.length, skipped: skipped.length, details, outputPath: outputRoot };
     } catch (error) {
       appendAiCensorshipLog(error.code === "ABORT_ERR" ? "warning" : "error", `${error.code === "ABORT_ERR" ? "독립 작업 취소" : "독립 작업 중단"} · ${error.message}`);
       throw error;

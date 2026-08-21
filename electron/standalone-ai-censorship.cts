@@ -63,4 +63,51 @@ function standaloneOutputPath(outputRootValue, asset, extensionValue = "original
   return outputPath;
 }
 
-module.exports = { safeRelativePath, validatedImage, standaloneAssetsFromFiles, scanStandaloneFolder, standaloneOutputPath };
+function renamedStandaloneOutputPath(outputPathValue, number) {
+  const parsed = path.parse(path.resolve(String(outputPathValue || "")));
+  return path.join(parsed.dir, `${parsed.name} (${Math.max(2, Number(number) || 2)})${parsed.ext}`);
+}
+
+async function existingPath(targetPath) {
+  try { await fs.promises.stat(targetPath); return true; }
+  catch (error) { if (error.code === "ENOENT") return false; throw error; }
+}
+
+async function planStandaloneOutputs(outputRoot, assets, outputExtension = "original", conflictPolicyValue = "rename", pathExists = existingPath, platform = process.platform) {
+  const conflictPolicy = ["overwrite", "rename", "skip"].includes(conflictPolicyValue) ? conflictPolicyValue : "rename";
+  const pathKey = (value) => platform === "win32" ? value.toLocaleLowerCase() : value;
+  const reserved = new Set();
+  const outputPaths = new Map();
+  const selectedAssets = [];
+  const skipped = [];
+
+  for (const asset of assets) {
+    const initialPath = standaloneOutputPath(outputRoot, asset, outputExtension);
+    const sourceKey = pathKey(path.resolve(asset.savedPath));
+    let outputPath = initialPath;
+    let outputKey = pathKey(outputPath);
+
+    if (conflictPolicy === "overwrite") {
+      if (outputKey === sourceKey) throw new Error("원본 파일과 출력 파일의 경로가 같습니다. 다른 출력 폴더를 선택해 주세요.");
+    } else {
+      let conflict = outputKey === sourceKey || reserved.has(outputKey) || await pathExists(outputPath);
+      if (conflictPolicy === "skip" && conflict) {
+        skipped.push({ asset, outputPath });
+        continue;
+      }
+      for (let number = 2; conflict; number += 1) {
+        outputPath = renamedStandaloneOutputPath(initialPath, number);
+        outputKey = pathKey(outputPath);
+        conflict = outputKey === sourceKey || reserved.has(outputKey) || await pathExists(outputPath);
+      }
+    }
+
+    reserved.add(outputKey);
+    outputPaths.set(asset.id, outputPath);
+    selectedAssets.push(asset);
+  }
+
+  return { assets: selectedAssets, outputPaths, skipped, conflictPolicy };
+}
+
+module.exports = { safeRelativePath, validatedImage, standaloneAssetsFromFiles, scanStandaloneFolder, standaloneOutputPath, renamedStandaloneOutputPath, planStandaloneOutputs };

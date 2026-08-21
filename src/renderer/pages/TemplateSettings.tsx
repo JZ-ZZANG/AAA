@@ -9,7 +9,7 @@ function TemplateSettings({ onBack }) {
   const [tab, setTab] = useState("prompts");
 
   return <>
-    <ProjectTitlebarNav project={TEMPLATE_SCOPE} tab={tab} onTab={setTab} onHome={onBack} templateMode />
+    <ProjectTitlebarNav project={TEMPLATE_SCOPE} tab={tab} onTab={setTab} onHome={onBack} contextLabel="템플릿 설정" templateMode />
     <main className="page project-page template-settings-page">
       {tab === "prompts" ? <Prompts project={TEMPLATE_SCOPE} api={window.aaa.promptTemplates} />
         : tab === "lorebook" ? <Lorebooks project={TEMPLATE_SCOPE} api={window.aaa.lorebookTemplates} />

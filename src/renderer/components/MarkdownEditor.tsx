@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 import { Table2, X } from "lucide-react";
 
 function escapeHtml(value) {
@@ -79,6 +79,22 @@ const MarkdownEditor = forwardRef<any, any>(function MarkdownEditor({ value, onC
   const codeView = useRef(null);
   const tableSelection = useRef({ start: 0, end: 0 });
 
+  function syncCodeView() {
+    const input = editorInput.current;
+    const view = codeView.current;
+    if (!input || !view) return;
+    view.style.width = `${input.clientWidth}px`;
+    view.style.transform = `translate(0, ${-input.scrollTop}px)`;
+  }
+
+  useLayoutEffect(() => {
+    syncCodeView();
+    const observer = new ResizeObserver(syncCodeView);
+    if (editorInput.current) observer.observe(editorInput.current);
+    return () => observer.disconnect();
+  }, []);
+  useLayoutEffect(syncCodeView, [value]);
+
   function updateSelection({ highlightWord = false } = {}) {
     const input = editorInput.current;
     if (!input) return;
@@ -119,7 +135,7 @@ const MarkdownEditor = forwardRef<any, any>(function MarkdownEditor({ value, onC
   function showTableContextMenu(event) { const table = findMarkdownTable(value, event.currentTarget.selectionStart); if (!table) return; event.preventDefault(); setTableContextMenu({ x: Math.min(event.clientX, window.innerWidth - 150), y: Math.min(event.clientY, window.innerHeight - 54), table }); }
   useEffect(() => { if (!tableContextMenu) return undefined; const close = () => setTableContextMenu(null); const escape = (event) => event.key === "Escape" && close(); window.addEventListener("pointerdown", close); window.addEventListener("keydown", escape); window.addEventListener("blur", close); return () => { window.removeEventListener("pointerdown", close); window.removeEventListener("keydown", escape); window.removeEventListener("blur", close); }; }, [tableContextMenu]);
   const lines = value.split("\n");
-  return <><div className="prompt-editor-body"><pre ref={codeView} className="prompt-code-view" aria-hidden="true">{lines.map((line, index) => <span className="prompt-code-row" key={index}><span className="prompt-line-number">{index + 1}</span><span className="prompt-code-content" dangerouslySetInnerHTML={{ __html: highlightLine(line || " ", cursorWord) }} /></span>)}</pre><textarea ref={editorInput} value={value} onChange={(event) => { onChange(event.target.value); updateSelection(); }} onKeyDown={handleKeyDown} onContextMenu={showTableContextMenu} onSelect={() => updateSelection()} onKeyUp={() => updateSelection()} onMouseUp={() => requestAnimationFrame(() => updateSelection({ highlightWord: true }))} onScroll={() => { const input = editorInput.current; if (codeView.current && input) codeView.current.style.transform = `translate(${-input.scrollLeft}px, ${-input.scrollTop}px)`; }} spellCheck="false" /></div>{bottomPanel}<footer className="prompt-status-bar"><span className="prompt-status-language">Markdown</span>{footerItems}<span>전체 {value.length.toLocaleString()}자</span><span>선택 {selection.length.toLocaleString()}자</span></footer>{tableContextMenu && <div className="prompt-table-context-menu" style={{ left: tableContextMenu.x, top: tableContextMenu.y }} onPointerDown={(event) => event.stopPropagation()}><button className="button-with-icon" onClick={() => { const table = tableContextMenu.table; tableSelection.current = { start: table.start, end: table.end }; setTableContextMenu(null); setTableDialog(table); }}><Table2 size={15} />표 편집</button></div>}{tableDialog && <MarkdownTableDialog initialTable={tableDialog.headers ? tableDialog : null} onClose={() => setTableDialog(null)} onInsert={insertMarkdownTable} />}</>;
+  return <><div className="prompt-editor-body"><pre ref={codeView} className="prompt-code-view" aria-hidden="true">{lines.map((line, index) => <span className="prompt-code-row" key={index}><span className="prompt-line-number">{index + 1}</span><span className="prompt-code-content" dangerouslySetInnerHTML={{ __html: highlightLine(line || " ", cursorWord) }} /></span>)}</pre><textarea ref={editorInput} value={value} onChange={(event) => { onChange(event.target.value); updateSelection(); }} onKeyDown={handleKeyDown} onContextMenu={showTableContextMenu} onSelect={() => updateSelection()} onKeyUp={() => updateSelection()} onMouseUp={() => requestAnimationFrame(() => updateSelection({ highlightWord: true }))} onScroll={syncCodeView} spellCheck="false" /></div>{bottomPanel}<footer className="prompt-status-bar"><span className="prompt-status-language">Markdown</span>{footerItems}<span>전체 {value.length.toLocaleString()}자</span><span>선택 {selection.length.toLocaleString()}자</span></footer>{tableContextMenu && <div className="prompt-table-context-menu" style={{ left: tableContextMenu.x, top: tableContextMenu.y }} onPointerDown={(event) => event.stopPropagation()}><button className="button-with-icon" onClick={() => { const table = tableContextMenu.table; tableSelection.current = { start: table.start, end: table.end }; setTableContextMenu(null); setTableDialog(table); }}><Table2 size={15} />표 편집</button></div>}{tableDialog && <MarkdownTableDialog initialTable={tableDialog.headers ? tableDialog : null} onClose={() => setTableDialog(null)} onInsert={insertMarkdownTable} />}</>;
 });
 
 export { MarkdownEditor };

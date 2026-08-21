@@ -197,7 +197,7 @@ function GifMaker({ onBack }) {
   }
 
   return <>
-    <ProjectTitlebarNav project={null} tab="gif-maker" onHome={onBack} />
+    <ProjectTitlebarNav project={null} tab="gif-maker" onHome={onBack} contextLabel="움짤 생성" />
     <main className="page gif-maker-page">
       <header className="gif-maker-heading">
         <h1>움짤 생성</h1>
