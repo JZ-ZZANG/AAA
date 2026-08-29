@@ -87,6 +87,20 @@ function combinations(tags: any[]): any[] {
   );
 }
 
+function classificationTagAreas(ruleTags: any[], layout: any = {}) {
+  const ruleTagIds = ruleTags.map((tag) => tag.id);
+  const validTagIds = new Set(ruleTagIds);
+  const uniqueValidIds = (value) => Array.isArray(value) ? [...new Set(value.filter((id) => validTagIds.has(id)))] : [];
+  const hasSavedAreas = Array.isArray(layout.sidebarTagIds) || Array.isArray(layout.topbarTagIds);
+  const sidebarTagIds = hasSavedAreas ? uniqueValidIds(layout.sidebarTagIds) : ruleTagIds.slice(0, 1);
+  const sidebarIdSet = new Set(sidebarTagIds);
+  const topbarTagIds = (hasSavedAreas ? uniqueValidIds(layout.topbarTagIds) : ruleTagIds.length > 2 ? ruleTagIds.slice(1, -1) : [])
+    .filter((id) => !sidebarIdSet.has(id));
+  const topbarIdSet = new Set(topbarTagIds);
+  const cardTagIds = ruleTagIds.filter((id) => !sidebarIdSet.has(id) && !topbarIdSet.has(id));
+  return { sidebarTagIds, cardTagIds, topbarTagIds };
+}
+
 function renderPath(project, selections, extension = "") {
   let result = extension
     ? project.pathTemplate.replaceAll("{extension}", extension)
@@ -144,4 +158,4 @@ function matchesProjectPath(project, relativePath) {
   return new RegExp(`^${pattern}$`, "i").test(withoutExtension(relativePath).replaceAll("\\", "/"));
 }
 
-export { EXTENSIONS, ORIGINAL_EXTENSION, TRACKED_EXTENSIONS, DEFAULT_SHORTCUTS, DEFAULT_CENSOR_SHORTCUTS, CENSOR_TARGET_OPTIONS, DEFAULT_CENSORSHIP, DEFAULT_STICKERS, shortcutFromEvent, matchesShortcut, savedShortcuts, savedCensorShortcuts, savedCensorshipSettings, wheelShortcutFromEvent, matchesInputShortcut, editableRule, storedRule, normalizeProject, combinations, renderPath, findPathRuleCollision, withoutExtension, matchesProjectPath, registerCensorEditFlusher, flushCensorEdits };
+export { EXTENSIONS, ORIGINAL_EXTENSION, TRACKED_EXTENSIONS, DEFAULT_SHORTCUTS, DEFAULT_CENSOR_SHORTCUTS, CENSOR_TARGET_OPTIONS, DEFAULT_CENSORSHIP, DEFAULT_STICKERS, shortcutFromEvent, matchesShortcut, savedShortcuts, savedCensorShortcuts, savedCensorshipSettings, wheelShortcutFromEvent, matchesInputShortcut, editableRule, storedRule, normalizeProject, combinations, classificationTagAreas, renderPath, findPathRuleCollision, withoutExtension, matchesProjectPath, registerCensorEditFlusher, flushCensorEdits };

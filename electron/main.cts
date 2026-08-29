@@ -112,8 +112,8 @@ function registerGifPreviewPath(imagePath) {
 
 async function createWindow() {
   const window = new BrowserWindow({
-    width: 1240,
-    height: 780,
+    width: 1280,
+    height: 800,
     minWidth: 900,
     minHeight: 600,
     show: false,

@@ -2675,6 +2675,7 @@ input:focus, textarea:focus, select:focus {
 .asset-board {
    display: grid;
    min-width: 0;
+   min-height: calc(100vh - var(--titlebar-height) - 58px);
 }
 
 .asset-board.with-sidebar {
@@ -2685,17 +2686,30 @@ input:focus, textarea:focus, select:focus {
 .board-sidebar {
    position: sticky;
    top: 0;
+   display: grid;
+   grid-template-rows: auto minmax(0, 1fr);
    align-self: start;
-   max-height: calc(100vh - 90px);
-   overflow-y: auto;
-   scrollbar-gutter: stable both-edges;
+   width: 100%;
+   height: calc(100vh - var(--titlebar-height) - 58px);
+   min-height: 320px;
+   max-height: calc(100vh - var(--titlebar-height) - 58px);
+   overflow: hidden;
+   scrollbar-gutter: auto;
    padding: 10px;
    border: 1px solid var(--border);
    border-radius: var(--radius-lg);
    background: var(--bg-panel);
 }
 
-.board-sidebar > strong {
+.sidebar-option-list {
+   min-width: 0;
+   min-height: 0;
+   overflow-x: hidden;
+   overflow-y: auto;
+   scrollbar-gutter: stable;
+}
+
+.sidebar-option-list > strong {
    display: block;
    padding: 4px 7px 10px;
    font-size: var(--font-section);
@@ -2749,14 +2763,14 @@ input:focus, textarea:focus, select:focus {
    font-size: var(--font-meta);
 }
 
-.classification-view-options {
+.classification-area-options {
    display: grid;
    gap: 7px;
 }
 
-.classification-view-options label {
+.classification-area-row {
    display: grid;
-   grid-template-columns: 18px minmax(0, 1fr);
+   grid-template-columns: minmax(0, 1fr) auto;
    gap: 10px;
    align-items: center;
    padding: 11px 12px;
@@ -2765,28 +2779,37 @@ input:focus, textarea:focus, select:focus {
    background: var(--bg-input);
 }
 
-.classification-view-options label.active {
-   border-color: var(--border-strong);
-   background: var(--bg-selected);
+.classification-area-meta {
+   display: grid;
+   min-width: 0;
+   gap: 4px;
 }
 
-.classification-view-options input {
-   width: 17px;
-   height: 17px;
-   margin: 0;
-   accent-color: var(--accent);
-}
-
-.classification-view-options label > span {
-   display: flex;
-   align-items: baseline;
-   justify-content: space-between;
-   gap: 12px;
-}
-
-.classification-view-options small {
+.classification-area-meta small {
    color: var(--text-muted);
    font-size: var(--font-meta);
+}
+
+.classification-area-choices {
+   display: grid;
+   grid-template-columns: repeat(3, 70px);
+   gap: 4px;
+}
+
+.classification-area-choices button {
+   min-height: 32px;
+   padding: 0 8px;
+   border: 1px solid var(--border);
+   border-radius: var(--radius-sm);
+   color: var(--text-muted);
+   background: var(--bg-panel);
+   font-size: var(--font-meta);
+}
+
+.classification-area-choices button.active {
+   border-color: var(--border-strong);
+   color: var(--text-main);
+   background: var(--bg-selected);
 }
 
 .classification-view-summary {
@@ -2816,8 +2839,10 @@ input:focus, textarea:focus, select:focus {
    grid-template-columns: repeat(3, 40px);
    justify-content: center;
    gap: 6px;
+   width: 132px;
+   justify-self: center;
    margin-bottom: 10px;
-   margin-inline: -10px;
+   margin-inline: 0;
 }
 
 .board-sidebar .sidebar-layout-controls button {

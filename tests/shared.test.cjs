@@ -33,3 +33,36 @@ test("빈 저장값을 선택 태그로 사용하고 최종 경로 충돌을 찾
   project.tags[2].values.push({ id: "ambiguous", label: "충돌 상황", value: "A001" });
   assert.equal(findPathRuleCollision(project)?.path, "M/A001.png");
 });
+
+test("분류 기준은 기본적으로 첫 항목을 사이드바, 중간 항목을 상단바, 마지막 항목을 카드에 배치한다", async () => {
+  const { classificationTagAreas } = await import("../src/renderer/shared.ts");
+  const tags = [{ id: "character" }, { id: "pose" }, { id: "expression" }];
+  assert.deepEqual(classificationTagAreas(tags), {
+    sidebarTagIds: ["character"],
+    cardTagIds: ["expression"],
+    topbarTagIds: ["pose"]
+  });
+  assert.deepEqual(classificationTagAreas(tags.slice(0, 2)), {
+    sidebarTagIds: ["character"],
+    cardTagIds: ["pose"],
+    topbarTagIds: []
+  });
+  assert.deepEqual(classificationTagAreas(tags.slice(0, 1)), {
+    sidebarTagIds: ["character"],
+    cardTagIds: [],
+    topbarTagIds: []
+  });
+});
+
+test("저장한 분류 영역 배치를 적용하고 중복 및 삭제된 기준을 제거한다", async () => {
+  const { classificationTagAreas } = await import("../src/renderer/shared.ts");
+  const tags = [{ id: "character" }, { id: "pose" }, { id: "expression" }];
+  assert.deepEqual(classificationTagAreas(tags, {
+    sidebarTagIds: ["pose", "pose", "deleted"],
+    topbarTagIds: ["pose", "character"]
+  }), {
+    sidebarTagIds: ["pose"],
+    cardTagIds: ["expression"],
+    topbarTagIds: ["character"]
+  });
+});
