@@ -179,6 +179,11 @@ class Store {
     `).all().map((row) => ({ ...row, assetCount: Number(row.assetCount), externalTracking: Boolean(row.externalTracking) }));
   }
 
+  touchProject(projectId, updatedAt = new Date().toISOString()) {
+    const result = this.db.prepare("UPDATE projects SET updated_at = ? WHERE id = ?").run(updatedAt, projectId);
+    return Number(result.changes) > 0;
+  }
+
   createProject({ name, savePath, censorshipConfig = {} }) {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
@@ -248,6 +253,7 @@ class Store {
     const now = new Date().toISOString();
     const position = Number(this.db.prepare("SELECT COALESCE(MAX(position), -1) + 1 AS position FROM prompts WHERE project_id = ?").get(projectId).position);
     this.db.prepare("INSERT INTO prompts (id, project_id, title, content, position, created_at, updated_at) VALUES (?, ?, ?, '', ?, ?, ?)").run(id, projectId, title, position, now, now);
+    this.touchProject(projectId, now);
     return this.getPrompt(id);
   }
 
@@ -263,17 +269,23 @@ class Store {
     const now = new Date().toISOString();
     const position = Number(this.db.prepare("SELECT COALESCE(MAX(position), -1) + 1 AS position FROM prompts WHERE project_id = ?").get(projectId).position);
     this.db.prepare("INSERT INTO prompts (id, project_id, title, content, folder_id, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(copyId, projectId, title, source.content, source.folderId || "", position, now, now);
+    this.touchProject(projectId, now);
     return this.getPrompt(copyId);
   }
 
   savePrompt({ id, projectId, title, content }) {
+    const current = this.getPrompt(id);
+    if (!current || current.projectId !== projectId) return null;
+    if (current.title === title && current.content === content) return current;
     const now = new Date().toISOString();
     this.db.prepare("UPDATE prompts SET title = ?, content = ?, updated_at = ? WHERE id = ? AND project_id = ?").run(title, content, now, id, projectId);
+    this.touchProject(projectId, now);
     return this.getPrompt(id);
   }
 
   deletePrompt(id, projectId) {
-    this.db.prepare("DELETE FROM prompts WHERE id = ? AND project_id = ?").run(id, projectId);
+    const result = this.db.prepare("DELETE FROM prompts WHERE id = ? AND project_id = ?").run(id, projectId);
+    if (Number(result.changes) > 0) this.touchProject(projectId);
     return true;
   }
 
@@ -282,6 +294,7 @@ class Store {
     this.db.exec("BEGIN IMMEDIATE");
     try {
       ids.forEach((id, position) => update.run(position, id, projectId));
+      if (ids.length) this.touchProject(projectId);
       this.db.exec("COMMIT");
     } catch (error) {
       this.db.exec("ROLLBACK");
@@ -307,6 +320,7 @@ class Store {
     const now = new Date().toISOString();
     const position = Number(this.db.prepare("SELECT COALESCE(MAX(position), -1) + 1 AS position FROM situations WHERE project_id = ?").get(projectId).position);
     this.db.prepare("INSERT INTO situations (id, project_id, title, content, position, created_at, updated_at) VALUES (?, ?, ?, '', ?, ?, ?)").run(id, projectId, title, position, now, now);
+    this.touchProject(projectId, now);
     return this.getSituation(id);
   }
 
@@ -322,17 +336,23 @@ class Store {
     const now = new Date().toISOString();
     const position = Number(this.db.prepare("SELECT COALESCE(MAX(position), -1) + 1 AS position FROM situations WHERE project_id = ?").get(projectId).position);
     this.db.prepare("INSERT INTO situations (id, project_id, title, content, folder_id, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(copyId, projectId, title, source.content, source.folderId || "", position, now, now);
+    this.touchProject(projectId, now);
     return this.getSituation(copyId);
   }
 
   saveSituation({ id, projectId, title, content }) {
+    const current = this.getSituation(id);
+    if (!current || current.projectId !== projectId) return null;
+    if (current.title === title && current.content === content) return current;
     const now = new Date().toISOString();
     this.db.prepare("UPDATE situations SET title = ?, content = ?, updated_at = ? WHERE id = ? AND project_id = ?").run(title, content, now, id, projectId);
+    this.touchProject(projectId, now);
     return this.getSituation(id);
   }
 
   deleteSituation(id, projectId) {
-    this.db.prepare("DELETE FROM situations WHERE id = ? AND project_id = ?").run(id, projectId);
+    const result = this.db.prepare("DELETE FROM situations WHERE id = ? AND project_id = ?").run(id, projectId);
+    if (Number(result.changes) > 0) this.touchProject(projectId);
     return true;
   }
 
@@ -341,6 +361,7 @@ class Store {
     this.db.exec("BEGIN IMMEDIATE");
     try {
       ids.forEach((id, position) => update.run(position, id, projectId));
+      if (ids.length) this.touchProject(projectId);
       this.db.exec("COMMIT");
     } catch (error) {
       this.db.exec("ROLLBACK");
@@ -500,11 +521,17 @@ class Store {
     const id = crypto.randomUUID();
     const position = Number(this.db.prepare("SELECT COALESCE(MAX(position), -1) + 1 AS position FROM project_entry_folders WHERE project_id = ? AND type = ?").get(projectId, type).position);
     this.db.prepare("INSERT INTO project_entry_folders (id, project_id, type, name, position, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(id, projectId, type, name, position, new Date().toISOString());
+    this.touchProject(projectId);
     return this.listProjectEntryFolders(projectId, type).find((folder) => folder.id === id);
   }
 
   renameProjectEntryFolder(id, projectId, type, name) {
-    this.db.prepare("UPDATE project_entry_folders SET name = ? WHERE id = ? AND project_id = ? AND type = ?").run(name, id, projectId, type);
+    const current = this.listProjectEntryFolders(projectId, type).find((folder) => folder.id === id);
+    if (!current) return null;
+    if (current.name !== name) {
+      this.db.prepare("UPDATE project_entry_folders SET name = ? WHERE id = ? AND project_id = ? AND type = ?").run(name, id, projectId, type);
+      this.touchProject(projectId);
+    }
     return this.listProjectEntryFolders(projectId, type).find((folder) => folder.id === id) || null;
   }
 
@@ -512,7 +539,8 @@ class Store {
     const table = { prompt: "prompts", situation: "situations", lorebook: "lorebooks" }[type];
     if (!table) throw new Error("폴더 종류가 올바르지 않습니다.");
     this.db.prepare(`UPDATE ${table} SET folder_id = '' WHERE folder_id = ? AND project_id = ?`).run(id, projectId);
-    this.db.prepare("DELETE FROM project_entry_folders WHERE id = ? AND project_id = ? AND type = ?").run(id, projectId, type);
+    const result = this.db.prepare("DELETE FROM project_entry_folders WHERE id = ? AND project_id = ? AND type = ?").run(id, projectId, type);
+    if (Number(result.changes) > 0) this.touchProject(projectId);
     return true;
   }
 
@@ -521,7 +549,12 @@ class Store {
     const getter = { prompt: () => this.getPrompt(id), situation: () => this.getSituation(id), lorebook: () => this.getLorebook(id) }[type];
     if (!table || !getter) throw new Error("폴더 종류가 올바르지 않습니다.");
     if (folderId && !this.db.prepare("SELECT id FROM project_entry_folders WHERE id = ? AND project_id = ? AND type = ?").get(folderId, projectId, type)) throw new Error("폴더를 찾을 수 없습니다.");
-    this.db.prepare(`UPDATE ${table} SET folder_id = ? WHERE id = ? AND project_id = ?`).run(folderId, id, projectId);
+    const current = getter();
+    if (!current || current.projectId !== projectId) return null;
+    if (current.folderId !== folderId) {
+      this.db.prepare(`UPDATE ${table} SET folder_id = ? WHERE id = ? AND project_id = ?`).run(folderId, id, projectId);
+      this.touchProject(projectId);
+    }
     return getter();
   }
 
@@ -537,8 +570,11 @@ class Store {
   }
 
   saveWork(projectId, introduction, tags, characterPreference = "ALL", ageRating = "SAFE") {
+    const current = this.getWork(projectId);
+    if (current.updatedAt && current.introduction === introduction && current.characterPreference === characterPreference && current.ageRating === ageRating && JSON.stringify(current.tags) === JSON.stringify(tags)) return current;
     const now = new Date().toISOString();
     this.db.prepare(`INSERT INTO works (project_id, introduction, character_preference, age_rating, tags, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(project_id) DO UPDATE SET introduction = excluded.introduction, character_preference = excluded.character_preference, age_rating = excluded.age_rating, tags = excluded.tags, updated_at = excluded.updated_at`).run(projectId, introduction, characterPreference, ageRating, JSON.stringify(tags), now);
+    this.touchProject(projectId, now);
     return this.getWork(projectId);
   }
 
@@ -550,6 +586,7 @@ class Store {
     const id = crypto.randomUUID();
     const position = Number(this.db.prepare("SELECT COALESCE(MAX(position), -1) + 1 AS position FROM work_title_images WHERE project_id = ?").get(projectId).position);
     this.db.prepare("INSERT INTO work_title_images (id, project_id, source_name, saved_path, position, created_at) VALUES (?, ?, '', '', ?, ?)").run(id, projectId, position, new Date().toISOString());
+    this.touchProject(projectId);
     return this.listWorkTitleImages(projectId).find((image) => image.id === id);
   }
 
@@ -557,25 +594,32 @@ class Store {
     const id = crypto.randomUUID();
     const position = Number(this.db.prepare("SELECT COALESCE(MAX(position), -1) + 1 AS position FROM work_title_images WHERE project_id = ?").get(projectId).position);
     this.db.prepare("INSERT INTO work_title_images (id, project_id, source_name, saved_path, position, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(id, projectId, sourceName, savedPath, position, new Date().toISOString());
+    this.touchProject(projectId);
     return this.listWorkTitleImages(projectId).find((image) => image.id === id);
   }
 
   updateWorkTitleImage(id, sourceName, savedPath) {
+    const current = this.db.prepare("SELECT project_id AS projectId, source_name AS sourceName, saved_path AS savedPath FROM work_title_images WHERE id = ?").get(id);
+    if (!current) return false;
+    if (current.sourceName === sourceName && current.savedPath === savedPath) return true;
     this.db.prepare("UPDATE work_title_images SET source_name = ?, saved_path = ? WHERE id = ?").run(sourceName, savedPath, id);
+    this.touchProject(current.projectId);
     return true;
   }
 
   setWorkTitleSlotImage(id, projectId, sourceName, savedPath) {
     const result = this.db.prepare("UPDATE work_title_images SET source_name = ?, saved_path = ?, created_at = ? WHERE id = ? AND project_id = ?").run(sourceName, savedPath, new Date().toISOString(), id, projectId);
+    if (Number(result.changes) > 0) this.touchProject(projectId);
     return Number(result.changes) > 0;
   }
 
   clearWorkTitleSlotImage(id, projectId) {
     const result = this.db.prepare("UPDATE work_title_images SET source_name = '', saved_path = '' WHERE id = ? AND project_id = ?").run(id, projectId);
+    if (Number(result.changes) > 0) this.touchProject(projectId);
     return Number(result.changes) > 0;
   }
 
-  removeWorkTitleImage(id, projectId) { this.db.prepare("DELETE FROM work_title_images WHERE id = ? AND project_id = ?").run(id, projectId); return true; }
+  removeWorkTitleImage(id, projectId) { const result = this.db.prepare("DELETE FROM work_title_images WHERE id = ? AND project_id = ?").run(id, projectId); if (Number(result.changes) > 0) this.touchProject(projectId); return true; }
 
   getLorebook(id) {
     const entry = this.db.prepare("SELECT l.id, l.project_id AS projectId, l.title, l.folder_id AS folderId, f.name AS folderName, l.keywords, l.content, l.position, l.created_at AS createdAt, l.updated_at AS updatedAt FROM lorebooks l LEFT JOIN project_entry_folders f ON f.id = l.folder_id AND f.project_id = l.project_id AND f.type = 'lorebook' WHERE l.id = ?").get(id);
@@ -590,6 +634,7 @@ class Store {
     const now = new Date().toISOString();
     const position = Number(this.db.prepare("SELECT COALESCE(MAX(position), -1) + 1 AS position FROM lorebooks WHERE project_id = ?").get(projectId).position);
     this.db.prepare("INSERT INTO lorebooks (id, project_id, title, keywords, content, position, created_at, updated_at) VALUES (?, ?, ?, '', '', ?, ?, ?)").run(id, projectId, title, position, now, now);
+    this.touchProject(projectId, now);
     return this.getLorebook(id);
   }
 
@@ -605,17 +650,23 @@ class Store {
     const now = new Date().toISOString();
     const position = Number(this.db.prepare("SELECT COALESCE(MAX(position), -1) + 1 AS position FROM lorebooks WHERE project_id = ?").get(projectId).position);
     this.db.prepare("INSERT INTO lorebooks (id, project_id, title, keywords, content, folder_id, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(copyId, projectId, title, JSON.stringify(source.keywords), source.content, source.folderId || "", position, now, now);
+    this.touchProject(projectId, now);
     return this.getLorebook(copyId);
   }
 
   saveLorebook({ id, projectId, title, keywords, content }) {
+    const current = this.getLorebook(id);
+    if (!current || current.projectId !== projectId) return null;
+    if (current.title === title && current.content === content && JSON.stringify(current.keywords) === JSON.stringify(keywords)) return current;
     const now = new Date().toISOString();
     this.db.prepare("UPDATE lorebooks SET title = ?, keywords = ?, content = ?, updated_at = ? WHERE id = ? AND project_id = ?").run(title, JSON.stringify(keywords), content, now, id, projectId);
+    this.touchProject(projectId, now);
     return this.getLorebook(id);
   }
 
   deleteLorebook(id, projectId) {
-    this.db.prepare("DELETE FROM lorebooks WHERE id = ? AND project_id = ?").run(id, projectId);
+    const result = this.db.prepare("DELETE FROM lorebooks WHERE id = ? AND project_id = ?").run(id, projectId);
+    if (Number(result.changes) > 0) this.touchProject(projectId);
     return true;
   }
 
@@ -624,6 +675,7 @@ class Store {
     this.db.exec("BEGIN IMMEDIATE");
     try {
       ids.forEach((id, position) => update.run(position, id, projectId));
+      if (ids.length) this.touchProject(projectId);
       this.db.exec("COMMIT");
     } catch (error) {
       this.db.exec("ROLLBACK");
@@ -645,7 +697,7 @@ class Store {
       this.db.prepare("INSERT INTO assets (id, project_id, source_name, relative_path, saved_path, created_at, file_size, modified_at, duplicate_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
         .run(id, projectId, sourceName, relativePath, savedPath, now, fileSize, modifiedAt, duplicateCount);
     }
-    this.db.prepare("UPDATE projects SET updated_at = ? WHERE id = ?").run(now, projectId);
+    this.touchProject(projectId, now);
     return { id, projectId, sourceName, relativePath, savedPath, createdAt: now, fileSize, modifiedAt, duplicateCount };
   }
 
@@ -678,6 +730,7 @@ class Store {
       const insert = this.db.prepare("INSERT INTO assets (id, project_id, source_name, relative_path, saved_path, created_at, file_size, modified_at, duplicate_count, review_status, cleaned_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
       const now = new Date().toISOString();
       entries.forEach((entry) => { const old = previous.get(logicalKey(entry.relativePath)); insert.run(old?.id || crypto.randomUUID(), projectId, entry.sourceName, entry.relativePath, entry.savedPath, now, entry.fileSize, entry.modifiedAt, entry.duplicateCount, old?.reviewStatus || "unreviewed", old?.cleanedPath || ""); });
+      this.touchProject(projectId, now);
       this.db.exec("COMMIT");
     } catch (error) {
       this.db.exec("ROLLBACK");
@@ -687,24 +740,38 @@ class Store {
   }
 
   refreshTrackedMetadata(projectId, metadata) {
+    let changed = false;
     const retainedIds = new Set(metadata.map((item) => item.id));
     this.listAssets(projectId).filter((asset) => !retainedIds.has(asset.id)).forEach((asset) => {
       this.db.prepare("DELETE FROM assets WHERE id = ?").run(asset.id);
+      changed = true;
     });
     const update = this.db.prepare("UPDATE assets SET file_size = ?, modified_at = ? WHERE id = ?");
-    metadata.forEach((item) => update.run(item.fileSize, item.modifiedAt, item.id));
+    metadata.forEach((item) => {
+      const current = this.getAsset(item.id);
+      if (!current || current.fileSize === item.fileSize && current.modifiedAt === item.modifiedAt) return;
+      update.run(item.fileSize, item.modifiedAt, item.id);
+      changed = true;
+    });
+    if (changed) this.touchProject(projectId);
     return this.listAssets(projectId);
   }
 
   removeAsset(id) {
-    this.db.prepare("DELETE FROM assets WHERE id = ?").run(id);
+    const asset = this.getAsset(id);
+    const result = this.db.prepare("DELETE FROM assets WHERE id = ?").run(id);
+    if (asset && Number(result.changes) > 0) this.touchProject(asset.projectId);
     return true;
   }
 
   setAssetReview(id, status, cleanedPath) {
     if (!["unreviewed", "auto", "manual", "failed"].includes(status)) throw new Error("검열 상태가 올바르지 않습니다.");
+    const asset = this.getAsset(id);
+    if (!asset) return false;
+    if (asset.reviewStatus === status && (cleanedPath === undefined || asset.cleanedPath === cleanedPath)) return true;
     if (cleanedPath === undefined) this.db.prepare("UPDATE assets SET review_status = ? WHERE id = ?").run(status, id);
     else this.db.prepare("UPDATE assets SET review_status = ?, cleaned_path = ? WHERE id = ?").run(status, cleanedPath, id);
+    this.touchProject(asset.projectId);
     return true;
   }
 

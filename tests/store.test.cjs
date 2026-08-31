@@ -3,7 +3,79 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { DatabaseSync } = require("node:sqlite");
 const { Store } = require("../electron-dist/store.cjs");
+
+test("프로젝트 내부 콘텐츠를 수정하면 최근 수정 프로젝트 순서가 갱신된다", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "aaa-project-recency-"));
+  let store;
+  try {
+    store = new Store(path.join(root, "test.sqlite"));
+    const editedProject = store.createProject({ name: "수정할 프로젝트", savePath: path.join(root, "edited") });
+    const otherProject = store.createProject({ name: "다른 프로젝트", savePath: path.join(root, "other") });
+    const prompt = store.createPrompt(editedProject.id);
+
+    store.db.prepare("UPDATE projects SET updated_at = ? WHERE id = ?").run("2000-01-01T00:00:00.000Z", editedProject.id);
+    store.db.prepare("UPDATE projects SET updated_at = ? WHERE id = ?").run("2020-01-01T00:00:00.000Z", otherProject.id);
+    const saved = store.savePrompt({ ...prompt, title: "수정된 프롬프트", content: "새 내용" });
+
+    assert.equal(store.listProjects()[0].id, editedProject.id);
+    assert.equal(store.getProject(editedProject.id).updatedAt, saved.updatedAt);
+
+    store.db.prepare("UPDATE projects SET updated_at = ? WHERE id = ?").run("2000-01-01T00:00:00.000Z", editedProject.id);
+    store.savePrompt(saved);
+    assert.equal(store.getProject(editedProject.id).updatedAt, "2000-01-01T00:00:00.000Z", "변경 없는 자동 저장은 프로젝트 수정 시각을 바꾸지 않는다");
+  } finally {
+    store?.close();
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("기존 프로젝트 DB를 스키마 변경 없이 열고 최근 수정 시각을 갱신한다", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "aaa-project-recency-legacy-"));
+  const databasePath = path.join(root, "legacy.sqlite");
+  let store;
+  const legacy = new DatabaseSync(databasePath);
+  try {
+    legacy.exec(`
+      CREATE TABLE projects (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        save_path TEXT NOT NULL,
+        external_tracking INTEGER NOT NULL DEFAULT 0,
+        censorship_config TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TABLE prompts (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+    `);
+    const insertProject = legacy.prepare("INSERT INTO projects (id, name, save_path, created_at, updated_at) VALUES (?, ?, ?, ?, ?)");
+    insertProject.run("legacy-project", "기존 프로젝트", path.join(root, "legacy"), "2000-01-01T00:00:00.000Z", "2000-01-01T00:00:00.000Z");
+    insertProject.run("newer-project", "다른 프로젝트", path.join(root, "newer"), "2020-01-01T00:00:00.000Z", "2020-01-01T00:00:00.000Z");
+    legacy.prepare("INSERT INTO prompts (id, project_id, title, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)")
+      .run("legacy-prompt", "legacy-project", "기존 프롬프트", "이전 내용", "2000-01-01T00:00:00.000Z", "2000-01-01T00:00:00.000Z");
+  } finally {
+    legacy.close();
+  }
+
+  try {
+    store = new Store(databasePath);
+    const projectColumns = store.db.prepare("PRAGMA table_info(projects)").all().map((column) => column.name);
+    assert.deepEqual(projectColumns, ["id", "name", "save_path", "external_tracking", "censorship_config", "created_at", "updated_at"]);
+    store.savePrompt({ id: "legacy-prompt", projectId: "legacy-project", title: "기존 프롬프트", content: "업데이트 후 수정" });
+    assert.equal(store.listProjects()[0].id, "legacy-project");
+  } finally {
+    store?.close();
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
 
 test("프로젝트, 분류 기준, 규칙과 에셋 정보를 저장한다", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "aaa-store-"));
