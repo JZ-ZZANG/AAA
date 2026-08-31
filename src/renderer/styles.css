@@ -2423,6 +2423,7 @@ input:focus, textarea:focus, select:focus {
    color: var(--text-main);
    background: var(--bg-input);
    font-size: var(--font-body);
+   font-synthesis: weight style;
    line-height: 1.75;
 }
 
@@ -2439,6 +2440,9 @@ input:focus, textarea:focus, select:focus {
 .markdown-rendered-preview ol, .markdown-rendered-preview blockquote {
    margin: 0 0 1em;
 }
+
+.markdown-rendered-preview strong { font-weight: var(--weight-title); }
+.markdown-rendered-preview em { font-style: italic; }
 
 .markdown-rendered-preview ul, .markdown-rendered-preview ol { padding-left: 1.7em; }
 .markdown-rendered-preview li::marker { color: var(--markdown-list); }
