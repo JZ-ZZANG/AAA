@@ -171,16 +171,40 @@ async function runWorker(jobPath, onMessage, signal, workerPath = "") {
   }
 }
 
-async function runAiCensorship({ project, assets, settings, onProgress, onResult, signal, workerPath = "", resolveOutputPath = null }) {
-  throwIfCancelled(signal);
-  const allowedTargets = new Set(["nipple", "vulva", "anus", "penis", "testicles", "x_ray", "cross_section"]);
-  const targets = [...new Set(Array.isArray(settings.targets) ? settings.targets.filter((target) => allowedTargets.has(target)) : [])];
-  if (!targets.length) throw new Error("검열 대상을 하나 이상 선택해 주세요.");
-  const modelPath = path.resolve(String(settings.modelPath || ""));
+async function validatedModelPath(modelPathValue) {
+  const modelPath = path.resolve(String(modelPathValue || ""));
   let modelStats;
   try { modelStats = await fs.promises.stat(modelPath); }
   catch (error) { if (error.code === "ENOENT") throw new Error("사용할 수 있는 .pt 모델 파일을 지정해 주세요."); throw error; }
   if (path.extname(modelPath).toLowerCase() !== ".pt" || !modelStats.isFile()) throw new Error("사용할 수 있는 .pt 모델 파일을 지정해 주세요.");
+  return modelPath;
+}
+
+async function inspectAiModel(modelPathValue, workerPath = "") {
+  const modelPath = await validatedModelPath(modelPathValue);
+  const jobPath = path.join(os.tmpdir(), `aaa-ai-model-inspect-${process.pid}-${Date.now()}.json`);
+  let modelInfo = null;
+  await fs.promises.writeFile(jobPath, JSON.stringify({ action: "inspect", modelPath }), "utf8");
+  try {
+    await runWorker(jobPath, (message) => {
+      if (message.type === "model-info") modelInfo = message;
+    }, undefined, workerPath);
+    if (!modelInfo || !Array.isArray(modelInfo.classes)) throw new Error("모델에서 학습 클래스 정보를 받지 못했습니다.");
+    return modelInfo;
+  } finally {
+    await fs.promises.unlink(jobPath).catch(() => {});
+  }
+}
+
+function normalizedCensorTargets(value) {
+  return [...new Set(Array.isArray(value) ? value.map((target) => String(target).trim()).filter(Boolean) : [])];
+}
+
+async function runAiCensorship({ project, assets, settings, onProgress, onResult, signal, workerPath = "", resolveOutputPath = null }) {
+  throwIfCancelled(signal);
+  const targets = normalizedCensorTargets(settings.targets);
+  if (!targets.length) throw new Error("검열 대상을 하나 이상 선택해 주세요.");
+  const modelPath = await validatedModelPath(settings.modelPath);
   const jobPath = path.join(os.tmpdir(), `aaa-ai-censorship-${process.pid}-${Date.now()}.json`);
   const results = new Map();
   const total = assets.length;
@@ -219,4 +243,4 @@ async function runAiCensorship({ project, assets, settings, onProgress, onResult
   }
 }
 
-module.exports = { outputPathFor, renderCensoredAsset, runAiCensorship, runProcess };
+module.exports = { outputPathFor, renderCensoredAsset, inspectAiModel, normalizedCensorTargets, runAiCensorship, runProcess };

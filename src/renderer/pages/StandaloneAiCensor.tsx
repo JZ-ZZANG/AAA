@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { FolderOpen, Images, Palette, Play } from "lucide-react";
 import { ProjectTitlebarNav } from "../components/Shell";
-import { CENSOR_TARGET_OPTIONS, DEFAULT_CENSORSHIP, EXTENSIONS, ORIGINAL_EXTENSION, savedCensorshipSettings } from "../shared";
+import { ModelTargetsField } from "../components/ModelTargetsField";
+import { DEFAULT_CENSORSHIP, EXTENSIONS, ORIGINAL_EXTENSION, savedCensorshipSettings } from "../shared";
 
 const FILE_LIST_LIMIT = 200;
 
@@ -68,10 +69,6 @@ function StandaloneAiCensor({ onBack }) {
     if (selected) { setOutputPath(selected); setResult(null); setError(""); }
   };
 
-  const toggleTarget = (target) => {
-    setSettings((current) => ({ ...current, targets: current.targets.includes(target) ? current.targets.filter((item) => item !== target) : [...current.targets, target] }));
-  };
-
   const start = async () => {
     if (!files.length) { setError("작업할 이미지를 선택해 주세요."); return; }
     if (!outputPath) { setError("결과를 저장할 폴더를 선택해 주세요."); return; }
@@ -124,8 +121,8 @@ function StandaloneAiCensor({ onBack }) {
         <section className="standalone-ai-card ai-job-section">
           <header><h2>AI 설정</h2><span className={runtimeAvailable ? "success standalone-ai-runtime-status" : "error standalone-ai-runtime-status"}>{runtimeLoading ? "AI 패키지 확인 중" : runtimeAvailable ? "AI 패키지 사용 가능" : "AI 패키지 설치 필요"}</span></header>
           <div className="ai-settings-grid">
-            <label className="wide">검열 대상<div className="target-options">{CENSOR_TARGET_OPTIONS.map(([value, label]) => <button type="button" className={settings.targets.includes(value) ? "active" : ""} disabled={running} key={value} onClick={() => toggleTarget(value)}>{label}</button>)}</div></label>
             <label className="wide">모델 파일<div className="directory-field"><input readOnly value={settings.modelPath || ""} /><button className="outline-button" disabled={running} onClick={async () => { const modelPath = await window.aaa.chooseModel(); if (modelPath) setSettings({ ...settings, modelPath }); }}>찾아보기</button></div></label>
+            <ModelTargetsField className="wide" disabled={running} modelPath={settings.modelPath} targets={settings.targets} onChange={(targets) => setSettings((current) => ({ ...current, targets }))} />
             <label>입력 해상도<input type="number" min="320" max="4096" step="32" disabled={running} value={settings.imageSize || 1024} onChange={(event) => setSettings({ ...settings, imageSize: Math.max(320, Math.min(4096, Number(event.target.value) || 1024)) })} /></label>
             <label>탐지 신뢰도<div className="number-with-unit"><input type="number" min="1" max="100" disabled={running} value={settings.confidence || 50} onChange={(event) => setSettings({ ...settings, confidence: Math.max(1, Math.min(100, Number(event.target.value) || 1)) })} /><span>%</span></div></label>
             <label>방식<select value={settings.method} disabled={running} onChange={(event) => setSettings({ ...settings, method: event.target.value })}><option value="solid">단색</option><option value="blur">블러</option><option value="mosaic">모자이크</option></select></label>

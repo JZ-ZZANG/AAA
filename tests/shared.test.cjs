@@ -1,6 +1,12 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
+test("검열 대상 텍스트를 쉼표와 줄바꿈으로 나누고 중복을 제거한다", async () => {
+  const { formatCensorTargets, parseCensorTargets } = await import("../src/renderer/shared.ts");
+  assert.deepEqual(parseCensorTargets("nipple, custom target\nvulva, nipple"), ["nipple", "custom target", "vulva"]);
+  assert.equal(formatCensorTargets(["nipple", "custom target", "vulva"]), "nipple, custom target, vulva");
+});
+
 test("모든 태그 조합을 만들지 않고 프로젝트 저장 규칙과 경로를 비교한다", async () => {
   const { matchesProjectPath } = await import("../src/renderer/shared.ts");
   const project = {

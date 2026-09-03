@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
-const { AiRuntimeManager, compareVersions, safeArchiveEntry, validVersion } = require("../electron-dist/ai-runtime.cjs");
+const { AiRuntimeManager, RUNTIME_PROTOCOL_VERSION, compareVersions, safeArchiveEntry, validVersion } = require("../electron-dist/ai-runtime.cjs");
 
 test("AI Runtime 버전을 비교한다", () => {
   assert.equal(compareVersions("1.0.0", "1.0.0"), 0);
@@ -31,7 +31,7 @@ test("AI Runtime ZIP을 버전 폴더에 설치하고 현재 버전으로 지정
   const archive = path.join(temporaryRoot, "runtime.zip");
   await fs.promises.mkdir(source);
   await fs.promises.writeFile(path.join(source, "aaa-ai-worker.exe"), "worker");
-  await fs.promises.writeFile(path.join(source, "runtime.json"), JSON.stringify({ runtimeVersion: "1.2.3", protocolVersion: 1, entry: "aaa-ai-worker.exe" }));
+  await fs.promises.writeFile(path.join(source, "runtime.json"), JSON.stringify({ runtimeVersion: "1.2.3", protocolVersion: RUNTIME_PROTOCOL_VERSION, entry: "aaa-ai-worker.exe" }));
   const packed = spawnSync("tar", ["-a", "-c", "-f", archive, "-C", source, "."], { windowsHide: true });
   assert.equal(packed.status, 0, packed.stderr?.toString());
   const manager = new AiRuntimeManager({ getPath: () => temporaryRoot }, { rootPath: runtimeRoot, requestPath: path.join(temporaryRoot, "request") });

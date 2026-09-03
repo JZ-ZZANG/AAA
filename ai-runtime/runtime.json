@@ -1,6 +1,6 @@
 {
-  "runtimeVersion": "1.0.1",
-  "protocolVersion": 1,
+  "runtimeVersion": "1.0.2",
+  "protocolVersion": 2,
   "pythonVersion": "3.11",
   "torchVersion": "2.13.0+cpu",
   "torchvisionVersion": "0.28.0+cpu",

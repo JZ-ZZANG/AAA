@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Circle, Copy, Droplet, Eraser, Eye, Grid3X3, Home as HomeIcon, LayoutGrid, Minus, MoveDiagonal2, Paintbrush, PaintBucket, Palette, PanelLeftClose, PanelLeftOpen, Pencil, Plus, RectangleHorizontal, RectangleVertical, Redo2, RefreshCcw, RotateCw, ScrollText, Search, Settings as SettingsIcon, SlidersHorizontal, Square, SquareDashed, Star, Sticker, Trash2, Undo2, X } from "lucide-react";
 import { DeleteConfirmModal } from "../components/Shell";
-import { CENSOR_TARGET_OPTIONS, matchesProjectPath, savedCensorShortcuts, savedCensorshipSettings, matchesInputShortcut, registerCensorEditFlusher, flushCensorEdits } from "../shared";
+import { ModelTargetsField } from "../components/ModelTargetsField";
+import { matchesProjectPath, savedCensorShortcuts, savedCensorshipSettings, matchesInputShortcut, registerCensorEditFlusher, flushCensorEdits } from "../shared";
 import { STICKER_FAVORITES_EVENT, readStickerFavoriteIds } from "../sticker-favorites";
 import { TWEMOJI_CATEGORIES, categorizedTwemojiIds, twemojiCharacter, twemojiSticker } from "../twemoji-library";
 
@@ -1210,11 +1211,8 @@ function Censorship({ project }) {
           <div className="ai-file-picker">{aiScope === "manual" && <div className="ai-file-picker-search"><Search size={15} aria-hidden="true" /><input aria-label="수동 선택 파일 검색" placeholder="파일 검색" value={aiManualSearch} onChange={(event) => setAiManualSearch(event.target.value)} /></div>}{(aiScope === "manual" ? aiManualAssets : aiTargets).length ? (aiScope === "manual" ? aiManualAssets.map((asset) => <div className="ai-file-picker-row selectable" key={asset.id} onClick={() => toggleAiSelection(asset.id)}><input type="checkbox" aria-label={`${asset.relativePath} 선택`} checked={aiSelectedIds.includes(asset.id)} onClick={(event) => event.stopPropagation()} onChange={() => toggleAiSelection(asset.id)} /><span>{asset.relativePath}</span><small className={asset.reviewStatus}>{labels[asset.reviewStatus]}</small></div>) : aiTargets.map((asset) => <div className="ai-file-picker-row" key={asset.id}><i className="ai-checkbox-placeholder" aria-hidden="true" /><span>{asset.relativePath}</span><small className={asset.reviewStatus}>{labels[asset.reviewStatus]}</small></div>)) : <div className="ai-file-picker-empty">{aiScope === "manual" && aiManualSearch.trim() ? "검색 결과가 없습니다." : "파일이 없습니다."}</div>}</div>
         </div></section>
         <section className="ai-job-section"><h3>모델 설정</h3><div className="ai-settings-grid">
-          <label className="wide">검열 대상<div className="target-options">{CENSOR_TARGET_OPTIONS.map(([value, label]) => {
-            const selected = aiSettings.targets?.includes(value);
-            return <button type="button" className={selected ? "active" : ""} key={value} onClick={() => setAiSettings((current) => ({ ...current, targets: selected ? current.targets.filter((item) => item !== value) : [...(current.targets || []), value] }))}>{label}</button>;
-          })}</div></label>
           <label className="wide">모델 파일<div className="directory-field"><input readOnly value={aiSettings.modelPath || ""} /><button className="outline-button" onClick={async () => { const modelPath = await window.aaa.chooseModel(); if (modelPath) setAiSettings({ ...aiSettings, modelPath }); }}>찾아보기</button></div></label>
+          <ModelTargetsField className="wide" modelPath={aiSettings.modelPath} targets={aiSettings.targets} onChange={(targets) => setAiSettings((current) => ({ ...current, targets }))} />
           <label>입력 해상도<input type="number" min="320" max="4096" step="32" value={aiSettings.imageSize || 1024} onChange={(event) => setAiSettings({ ...aiSettings, imageSize: Math.max(320, Math.min(4096, Number(event.target.value) || 1024)) })} /></label>
           <label>탐지 신뢰도<div className="number-with-unit"><input type="number" min="1" max="100" value={aiSettings.confidence || 50} onChange={(event) => setAiSettings({ ...aiSettings, confidence: Math.max(1, Math.min(100, Number(event.target.value) || 1)) })} /><span>%</span></div></label>
         </div></section>

@@ -4,9 +4,13 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const sharp = require("sharp");
-const { renderCensoredAsset, runProcess } = require("../electron-dist/ai-censorship.cjs");
+const { normalizedCensorTargets, renderCensoredAsset, runProcess } = require("../electron-dist/ai-censorship.cjs");
 
 sharp.cache(false);
+
+test("고정 목록에 없는 사용자 모델 클래스도 검열 대상으로 유지한다", () => {
+  assert.deepEqual(normalizedCensorTargets([" custom target ", "nipple", "custom target", ""]), ["custom target", "nipple"]);
+});
 
 test("AI 탐지 영역을 설정한 방식으로 검열 이미지에 반영한다", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "aaa-ai-censor-"));

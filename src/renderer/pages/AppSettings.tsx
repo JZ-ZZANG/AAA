@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Download, ExternalLink, FolderArchive, Info, Keyboard, Palette, Plus, ShieldCheck, Star, Trash2, Upload } from "lucide-react";
-import { CENSOR_TARGET_OPTIONS, DEFAULT_SHORTCUTS, DEFAULT_CENSOR_SHORTCUTS, DEFAULT_CENSORSHIP, DEFAULT_STICKERS } from "../shared";
+import { DEFAULT_SHORTCUTS, DEFAULT_CENSOR_SHORTCUTS, DEFAULT_CENSORSHIP, DEFAULT_STICKERS } from "../shared";
 import { normalizedStickerFavoriteIds, publishStickerFavoriteIds } from "../sticker-favorites";
 import { TWEMOJI_CATEGORIES, categorizedTwemojiIds, twemojiCharacter, twemojiSticker } from "../twemoji-library";
 import { DeleteConfirmModal, ShortcutInput } from "../components/Shell";
+import { ModelTargetsField } from "../components/ModelTargetsField";
 import discordBlurpleIcon from "../assets/brands/Discord-Symbol-Blurple.svg";
 import discordWhiteIcon from "../assets/brands/Discord-Symbol-White.svg";
 import githubBlackIcon from "../assets/brands/GitHub_Invertocat_Black.svg";
@@ -265,10 +266,10 @@ function AppSettings({ preferences, onChange, onBack, updateState, onCheckUpdate
 
           {activeTab === "censorship" && <>
             <section className="app-setting-section global-censorship-setting"><div><h2>AI 검열 설정 기본값</h2></div><fieldset className="global-censorship-fields" disabled={!aiRuntime.available}>
-              <label className="censorship-target-field">검열 대상<div className="target-options">{CENSOR_TARGET_OPTIONS.map(([value, label]) => <button className={preferences.censorship.targets.includes(value) ? "active" : ""} key={value} onClick={() => { const targets = preferences.censorship.targets.includes(value) ? preferences.censorship.targets.filter((item) => item !== value) : [...preferences.censorship.targets, value]; onChange({ ...preferences, censorship: { ...preferences.censorship, targets } }); }}>{label}</button>)}</div></label>
+              <label className="censorship-model-field">검열용 모델 파일<div className="directory-field"><input value={preferences.censorship.modelPath} onChange={(event) => onChange({ ...preferences, censorship: { ...preferences.censorship, modelPath: event.target.value } })} /><button className="outline-button" onClick={async () => { const modelPath = await window.aaa.chooseModel(); if (modelPath) onChange({ ...preferences, censorship: { ...preferences.censorship, modelPath } }); }}>찾아보기</button></div></label>
+              <ModelTargetsField className="censorship-target-field" modelPath={preferences.censorship.modelPath} targets={preferences.censorship.targets} onChange={(targets) => onChange({ ...preferences, censorship: { ...preferences.censorship, targets } })} />
               <label>입력 해상도<input type="number" min="320" max="4096" step="32" value={preferences.censorship.imageSize || 1024} onChange={(event) => onChange({ ...preferences, censorship: { ...preferences.censorship, imageSize: Math.max(320, Math.min(4096, Number(event.target.value) || 1024)) } })} /></label>
               <label>AI 탐지 신뢰도<div className="number-with-unit"><input type="number" min="1" max="100" value={preferences.censorship.confidence || 50} onChange={(event) => onChange({ ...preferences, censorship: { ...preferences.censorship, confidence: Math.max(1, Math.min(100, Number(event.target.value) || 1)) } })} /><span>%</span></div></label>
-              <label className="censorship-model-field">검열용 모델 파일<div className="directory-field"><input value={preferences.censorship.modelPath} onChange={(event) => onChange({ ...preferences, censorship: { ...preferences.censorship, modelPath: event.target.value } })} /><button className="outline-button" onClick={async () => { const modelPath = await window.aaa.chooseModel(); if (modelPath) onChange({ ...preferences, censorship: { ...preferences.censorship, modelPath } }); }}>찾아보기</button></div></label>
             </fieldset></section>
             <section className="app-setting-section global-censorship-setting"><div><h2>브러쉬 설정 기본값</h2></div><div className="default-brush-grid">
               <div className="default-brush-row two-columns">

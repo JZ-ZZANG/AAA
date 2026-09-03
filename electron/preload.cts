@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld("aaa", {
     cancelInstall: () => ipcRenderer.invoke("ai-runtime:cancel-install"),
     remove: () => ipcRenderer.invoke("ai-runtime:remove"),
     openFolder: () => ipcRenderer.invoke("ai-runtime:open-folder"),
+    inspectModel: (modelPath) => ipcRenderer.invoke("ai-runtime:inspect-model", modelPath),
     onProgress: (callback) => {
       const listener = (_event, progress) => callback(progress);
       ipcRenderer.on("ai-runtime:progress", listener);

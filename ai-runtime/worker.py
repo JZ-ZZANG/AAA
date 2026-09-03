@@ -19,12 +19,34 @@ ALIASES = {
 }
 
 
+def normalized_label(value):
+    return str(value).strip().lower().replace(" ", "_").replace("-", "_")
+
+
 def canonical_label(value):
-    normalized = str(value).strip().lower().replace(" ", "_").replace("-", "_")
+    normalized = normalized_label(value)
     for target, aliases in ALIASES.items():
         if normalized in aliases:
             return target
     return normalized
+
+
+def model_classes(names):
+    if isinstance(names, dict):
+        entries = names.items()
+    elif isinstance(names, (list, tuple)):
+        entries = enumerate(names)
+    else:
+        entries = []
+    classes = []
+    for class_id, name in entries:
+        try:
+            normalized_id = int(class_id)
+        except (TypeError, ValueError):
+            continue
+        classes.append({"id": normalized_id, "name": str(name)})
+    classes.sort(key=lambda item: item["id"])
+    return classes
 
 
 def load_ultralytics(model_path):
@@ -47,7 +69,7 @@ def load_ultralytics(model_path):
             detections.append({"box": box, "polygon": polygon.tolist(), "confidence": float(score), "label": str(label)})
         return detections
 
-    return predict, "Ultralytics YOLO"
+    return predict, "Ultralytics YOLO", model_classes(getattr(model, "names", {}))
 
 
 def tensor_rows(output):
@@ -116,18 +138,23 @@ def main():
         job = json.load(stream)
     model_path = job["modelPath"]
     try:
-        predictor, model_kind = load_ultralytics(model_path)
+        predictor, model_kind, classes = load_ultralytics(model_path)
     except Exception as error:
         raise RuntimeError(f"YOLO 세그멘테이션 모델을 불러오지 못했습니다: {error}")
+    if job.get("action") == "inspect":
+        if not classes:
+            raise RuntimeError("모델에서 학습 클래스 정보를 찾지 못했습니다.")
+        emit({"type": "model-info", "model": model_kind, "task": "segment", "classes": classes})
+        return
     emit({"type": "loaded", "model": model_kind})
-    targets = set(job.get("targets", []))
+    targets = {normalized_label(target) for target in job.get("targets", []) if str(target).strip()}
     confidence = max(0.01, min(1.0, float(job.get("confidence", 0.5))))
     image_size = max(320, min(4096, int(job.get("imageSize", 640))))
     for index, item in enumerate(job.get("files", [])):
         try:
             detections = predictor(item["path"], confidence, image_size)
             if targets:
-                detections = [detection for detection in detections if canonical_label(detection["label"]) in targets or detection["label"] in targets]
+                detections = [detection for detection in detections if normalized_label(detection["label"]) in targets or canonical_label(detection["label"]) in targets]
             emit({"type": "result", "index": index, "detections": detections})
         except Exception as error:
             emit({"type": "result", "index": index, "detections": [], "error": str(error)})

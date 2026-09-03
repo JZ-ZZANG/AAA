@@ -6,7 +6,7 @@ const { Store } = require("./store.cjs");
 const { copyClassifiedAsset, renderRelativePath, IMAGE_EXTENSIONS, PROJECT_EXTENSIONS } = require("./classification.cjs");
 const { scanProjectInventory, refreshTrackedFiles } = require("./external-sync.cjs");
 const { createAnimation, saveGeneratedAnimation } = require("./gif.cjs");
-const { runAiCensorship } = require("./ai-censorship.cjs");
+const { inspectAiModel, runAiCensorship } = require("./ai-censorship.cjs");
 const { withStagedFileDeletion } = require("./safe-delete.cjs");
 const { originAssetRoot, cleanedAssetRoot } = require("./project-paths.cjs");
 const { createZip, readArchive, safeArchiveName } = require("./project-archive.cjs");
@@ -704,6 +704,12 @@ function registerIpc() {
     const error = await shell.openPath(aiRuntime.rootPath);
     if (error) throw new Error(error);
     return true;
+  });
+  ipcMain.handle("ai-runtime:inspect-model", async (_event, modelPath) => {
+    if (activeAiCensorshipPromise) throw new Error("AI 검열 작업 중에는 모델 정보를 불러올 수 없습니다.");
+    const packagedWorkerPath = app.isPackaged ? aiRuntime.installedWorkerPath() : "";
+    if (app.isPackaged && !packagedWorkerPath) throw new Error("AI 검열 기능이 설치되어 있지 않거나 현재 버전과 호환되지 않습니다.");
+    return inspectAiModel(modelPath, packagedWorkerPath);
   });
   ipcMain.handle("stickers:list", () => stickerListWithUrls());
   ipcMain.handle("stickers:add", async (event) => {

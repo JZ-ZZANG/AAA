@@ -7,7 +7,7 @@ const { Readable, Transform } = require("node:stream");
 const { pipeline } = require("node:stream/promises");
 const { net } = require("electron");
 
-const RUNTIME_PROTOCOL_VERSION = 1;
+const RUNTIME_PROTOCOL_VERSION = 2;
 const RELEASES_API = "https://api.github.com/repos/JZ-ZZANG/AAA/releases?per_page=40";
 const RUNTIME_TAG_PREFIX = "ai-v";
 const CURRENT_FILE = "current.json";

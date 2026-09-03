@@ -38,6 +38,14 @@ function savedShortcuts() { try { return { ...DEFAULT_SHORTCUTS, ...JSON.parse(l
 function savedCensorShortcuts() { try { return { ...DEFAULT_CENSOR_SHORTCUTS, ...JSON.parse(localStorage.getItem("aaa-preferences") || "{}").censorShortcuts }; } catch { return DEFAULT_CENSOR_SHORTCUTS; } }
 function savedCensorshipSettings() { try { return { ...DEFAULT_CENSORSHIP, ...JSON.parse(localStorage.getItem("aaa-preferences") || "{}").censorship }; } catch { return DEFAULT_CENSORSHIP; } }
 
+function parseCensorTargets(value) {
+  return [...new Set(String(value || "").split(/[,\r\n]+/).map((item) => item.trim()).filter(Boolean))];
+}
+
+function formatCensorTargets(targets) {
+  return (Array.isArray(targets) ? targets : []).map((target) => String(target).trim()).filter(Boolean).join(", ");
+}
+
 function wheelShortcutFromEvent(event) {
   return `${event.ctrlKey ? "Ctrl+" : ""}${event.shiftKey ? "Shift+" : ""}${event.altKey ? "Alt+" : ""}${event.deltaY < 0 ? "WheelUp" : "WheelDown"}`;
 }
@@ -158,4 +166,4 @@ function matchesProjectPath(project, relativePath) {
   return new RegExp(`^${pattern}$`, "i").test(withoutExtension(relativePath).replaceAll("\\", "/"));
 }
 
-export { EXTENSIONS, ORIGINAL_EXTENSION, TRACKED_EXTENSIONS, DEFAULT_SHORTCUTS, DEFAULT_CENSOR_SHORTCUTS, CENSOR_TARGET_OPTIONS, DEFAULT_CENSORSHIP, DEFAULT_STICKERS, shortcutFromEvent, matchesShortcut, savedShortcuts, savedCensorShortcuts, savedCensorshipSettings, wheelShortcutFromEvent, matchesInputShortcut, editableRule, storedRule, normalizeProject, combinations, classificationTagAreas, renderPath, findPathRuleCollision, withoutExtension, matchesProjectPath, registerCensorEditFlusher, flushCensorEdits };
+export { EXTENSIONS, ORIGINAL_EXTENSION, TRACKED_EXTENSIONS, DEFAULT_SHORTCUTS, DEFAULT_CENSOR_SHORTCUTS, CENSOR_TARGET_OPTIONS, DEFAULT_CENSORSHIP, DEFAULT_STICKERS, shortcutFromEvent, matchesShortcut, savedShortcuts, savedCensorShortcuts, savedCensorshipSettings, parseCensorTargets, formatCensorTargets, wheelShortcutFromEvent, matchesInputShortcut, editableRule, storedRule, normalizeProject, combinations, classificationTagAreas, renderPath, findPathRuleCollision, withoutExtension, matchesProjectPath, registerCensorEditFlusher, flushCensorEdits };
