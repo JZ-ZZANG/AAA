@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ClipboardCopy, Copy, GripVertical, LibraryBig, Plus, Save, Table2, Trash2, X } from "lucide-react";
+import { ClipboardCopy, Copy, GripVertical, LibraryBig, PanelLeftClose, PanelLeftOpen, Plus, Save, Table2, Trash2, X } from "lucide-react";
 import { MarkdownTableDialog, findMarkdownTable, highlightLine } from "./Prompts";
 import { MarkdownEditor } from "../components/MarkdownEditor";
 import { TemplatePicker } from "../components/TemplatePicker";
@@ -27,6 +27,7 @@ function LorebookKeywords({ entry, onChange }) {
 
 function Lorebooks({ project, api = null }) {
   const entryApi = api || window.aaa.lorebooks;
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem("aaa-lorebook-sidebar-collapsed") === "true");
   const [entries, setEntries] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -49,6 +50,10 @@ function Lorebooks({ project, api = null }) {
   const codeView = useRef(null);
   const tableSelection = useRef({ start: 0, end: 0 });
   const markdownEditor = useRef(null);
+
+  useEffect(() => {
+    localStorage.setItem("aaa-lorebook-sidebar-collapsed", String(sidebarCollapsed));
+  }, [sidebarCollapsed]);
 
   function replaceEntries(nextEntries) {
     entriesRef.current = nextEntries;
@@ -328,7 +333,8 @@ function Lorebooks({ project, api = null }) {
   const selected = entries.find((entry) => entry.id === selectedId) || null;
   const lines = (selected?.content || "").split("\n");
 
-  return <><section className="prompt-workspace lorebook-workspace">
+  return <><section className={`prompt-workspace lorebook-workspace ${!api && sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
+    {!api && <button className="outline-button editor-icon-button censorship-sidebar-toggle" aria-label={sidebarCollapsed ? "로어북 목록 열기" : "로어북 목록 숨기기"} data-tooltip={sidebarCollapsed ? "목록 열기" : "목록 숨기기"} onClick={() => setSidebarCollapsed((current) => !current)}>{sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}</button>}
     {entryApi.listFolders ? <LorebookTemplateFolders entryLabel="로어북" folders={folders} entries={sortedEntries} selectedId={selectedId} onSelect={setSelectedId} onCreateEntry={createEntry} onCreateFolder={createFolder} onRenameFolder={renameFolder} onDeleteFolder={deleteFolder} onMove={moveToFolder} onReorder={reorderTemplateEntry} onOpenTemplates={!api ? openTemplatePicker : null} renderEntryMeta={(entry) => entry.keywords.length} compactActions={!api} /> : <aside className="prompt-sidebar"><div className="prompt-sidebar-heading"><strong>로어북</strong><button className="outline-button button-with-icon" onClick={() => createEntry()}><Plus size={16} />새 로어북</button>{!api && <button className="outline-button button-with-icon" onClick={openTemplatePicker}><LibraryBig size={16} />템플릿 로어북 추가</button>}</div><div className="prompt-list lorebook-sidebar-list">{loading ? <p>불러오는 중…</p> : sortedEntries.map((entry) => <button className={`lorebook-list-button ${entry.id === selectedId ? "active" : ""} ${dropIndicator?.id === entry.id ? `drop-${dropIndicator.edge}` : ""}`} key={entry.id} draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; draggedId.current = entry.id; }} onDragEnd={() => setDropIndicator(null)} onDragOver={(event) => { event.preventDefault(); const bounds = event.currentTarget.getBoundingClientRect(); setDropIndicator({ id: entry.id, edge: event.clientY < bounds.top + bounds.height / 2 ? "before" : "after" }); }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setDropIndicator(null); }} onDrop={(event) => { event.preventDefault(); const edge = dropIndicator?.id === entry.id ? dropIndicator.edge : "before"; setDropIndicator(null); moveEntry(entry.id, edge); }} onClick={() => setSelectedId(entry.id)}><span className="lorebook-list-drag"><GripVertical size={17} /></span><span className="lorebook-list-copy"><strong>{entry.title}</strong></span><span className="lorebook-keyword-count" aria-label={`키워드 ${entry.keywords.length}개`}>{entry.keywords.length}</span></button>)}</div></aside>}
     <div className="lorebook-editor-column"><div className="prompt-editor">{selected ? <><header><input value={selected.title} onChange={(event) => updateEntry(selected.id, { title: event.target.value })} placeholder="로어북 제목" /><div><span className={status.includes("저장") || status.includes("사본") || status === "복사됨" ? "success" : "error"}>{status}</span><button className="outline-button editor-icon-button editor-table-action" aria-label="표 생성" data-tooltip="표 생성" onClick={() => markdownEditor.current?.openTableDialog()}><Table2 size={17} /></button><button className="outline-button editor-icon-button" aria-label="복사" data-tooltip="복사" onClick={() => copyContent(selected)}><ClipboardCopy size={17} /></button><button className="outline-button editor-icon-button" aria-label="사본 생성" data-tooltip="사본 생성" onClick={() => duplicateEntry(selected)}><Copy size={17} /></button><button className="outline-button editor-icon-button" aria-label="삭제" data-tooltip="삭제" onClick={() => setPendingDelete(selected)}><Trash2 size={17} /></button><button className="primary-button editor-icon-button" aria-label="저장" data-tooltip="저장" onClick={() => saveEntry(selected)}><Save size={17} /></button></div></header><MarkdownEditor ref={markdownEditor} value={selected.content} onChange={(content) => updateEntry(selected.id, { content })} /></> : <div className="prompt-empty"><p>로어북이 없습니다.</p></div>}</div><LorebookKeywords entry={selected} onChange={(changes) => selected && updateEntry(selected.id, changes)} /></div>
   </section>{templatePickerOpen && <TemplatePicker grouped fixedHeight title="템플릿 로어북 선택" templates={templates} loading={templatesLoading} onSelect={createEntry} onSelectGroup={createEntriesFromTemplates} onClose={() => setTemplatePickerOpen(false)} />}{pendingDelete && <DeleteConfirmModal title="로어북 삭제" target={pendingDelete.title || "제목 없는 로어북"} busy={deleting} onClose={() => setPendingDelete(null)} onConfirm={deleteEntry} />}</>;

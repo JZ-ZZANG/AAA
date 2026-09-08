@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ClipboardCopy, Copy, Eye, GripVertical, LibraryBig, Plus, Save, Table2, Trash2, X } from "lucide-react";
+import { ClipboardCopy, Copy, Eye, GripVertical, LibraryBig, PanelLeftClose, PanelLeftOpen, Plus, Save, Table2, Trash2, X } from "lucide-react";
 import { MarkdownEditor } from "../components/MarkdownEditor";
 import { MarkdownPreviewModal } from "../components/MarkdownPreview";
 import { TemplatePicker } from "../components/TemplatePicker";
@@ -117,6 +117,8 @@ function Prompts({ project, kind = "prompt", api = null }) {
   const entryApi = api || (isSituation ? window.aaa.situations : window.aaa.prompts);
   const entryLabel = isSituation ? "시작 상황" : "프롬프트";
   const emptyMessage = isSituation ? "시작 상황이 없습니다." : "프롬프트가 없습니다.";
+  const sidebarStorageKey = `aaa-${kind}-sidebar-collapsed`;
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem(sidebarStorageKey) === "true");
   const [prompts, setPrompts] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [draft, setDraft] = useState(null);
@@ -142,6 +144,10 @@ function Prompts({ project, kind = "prompt", api = null }) {
   const tableSelection = useRef({ start: 0, end: 0 });
   const markdownEditor = useRef(null);
   const draggedId = useRef(null);
+
+  useEffect(() => {
+    localStorage.setItem(sidebarStorageKey, String(sidebarCollapsed));
+  }, [sidebarCollapsed, sidebarStorageKey]);
 
   function setCurrentDraft(nextDraft) {
     draftRef.current = nextDraft;
@@ -473,7 +479,8 @@ function Prompts({ project, kind = "prompt", api = null }) {
 
   const lines = (draft?.content || "").split("\n");
   const sortedPrompts = [...prompts].sort((left, right) => left.position - right.position);
-  return <><section className="prompt-workspace">
+  return <><section className={`prompt-workspace ${!api && sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
+    {!api && <button className="outline-button editor-icon-button censorship-sidebar-toggle" aria-label={sidebarCollapsed ? `${entryLabel} 목록 열기` : `${entryLabel} 목록 숨기기`} data-tooltip={sidebarCollapsed ? "목록 열기" : "목록 숨기기"} onClick={() => setSidebarCollapsed((current) => !current)}>{sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}</button>}
     {entryApi.listFolders ? <EntryFolders entryLabel={entryLabel} folders={folders} entries={sortedPrompts} selectedId={selectedId} onSelect={selectPrompt} onCreateEntry={createPrompt} onCreateFolder={createFolder} onRenameFolder={renameFolder} onDeleteFolder={deleteFolder} onMove={moveToFolder} onReorder={reorderFolderEntry} onOpenTemplates={!api ? openTemplatePicker : null} compactActions={!api} /> : <aside className="prompt-sidebar"><div className="prompt-sidebar-heading"><strong>{entryLabel}</strong><button className="outline-button button-with-icon" onClick={() => createPrompt()}><Plus size={16} />새 {entryLabel}</button>{!api && <button className="outline-button button-with-icon" onClick={openTemplatePicker}><LibraryBig size={16} />템플릿 {entryLabel} 추가</button>}</div><div className="prompt-list">{loading ? <p>불러오는 중…</p> : prompts.map((prompt) => <button key={prompt.id} draggable className={`lorebook-list-button ${prompt.id === selectedId ? "active" : ""} ${dropIndicator?.id === prompt.id ? `drop-${dropIndicator.edge}` : ""}`} onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; draggedId.current = prompt.id; }} onDragEnd={() => { draggedId.current = null; setDropIndicator(null); }} onDragOver={(event) => { event.preventDefault(); const bounds = event.currentTarget.getBoundingClientRect(); setDropIndicator({ id: prompt.id, edge: event.clientY < bounds.top + bounds.height / 2 ? "before" : "after" }); }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setDropIndicator(null); }} onDrop={(event) => { event.preventDefault(); const edge = dropIndicator?.id === prompt.id ? dropIndicator.edge : "before"; setDropIndicator(null); movePrompt(prompt.id, edge); }} onClick={() => selectPrompt(prompt.id)}><span className="lorebook-list-drag"><GripVertical size={17} /></span><span className="lorebook-list-copy"><strong>{prompt.title}</strong></span></button>)}</div></aside>}
     <div className="prompt-editor">{draft ? <><header><input ref={titleInput} value={draft.title} onChange={(event) => updateDraft({ title: event.target.value })} placeholder={`${entryLabel} 제목`} /><div><span className={status.includes("저장") || status === "복사됨" ? "success" : "error"}>{status}</span><button className="outline-button editor-icon-button editor-table-action" aria-label="표 생성" data-tooltip="표 생성" onClick={() => markdownEditor.current?.openTableDialog()}><Table2 size={17} /></button><button className="outline-button editor-icon-button" aria-label="복사" data-tooltip="복사" onClick={copyContent}><ClipboardCopy size={17} /></button><button className="outline-button editor-icon-button" aria-label="사본 생성" data-tooltip="사본 생성" onClick={duplicatePrompt}><Copy size={17} /></button><button className="outline-button editor-icon-button" aria-label="삭제" data-tooltip="삭제" onClick={() => setPendingDelete(draft)}><Trash2 size={17} /></button><button className="primary-button editor-icon-button" aria-label="저장" data-tooltip="저장" onClick={savePrompt}><Save size={17} /></button></div></header><MarkdownEditor ref={markdownEditor} value={draft.content} onChange={(content) => updateDraft({ content })} bottomPanel={isSituation ? <div className="situation-preview-bar"><button className="outline-button button-with-icon" onClick={() => setPreviewOpen(true)}><Eye size={16} />미리보기</button></div> : null} /></> : <div className="prompt-empty"><p>{emptyMessage}</p></div>}</div>
   </section>{createMode === "templates" && <TemplatePicker grouped fixedHeight title={`템플릿 ${entryLabel} 선택`} templates={templates} loading={templatesLoading} onSelect={createPrompt} onSelectGroup={createPromptsFromTemplates} onClose={() => setCreateMode(null)} />}{previewOpen && draft && <MarkdownPreviewModal title={`${draft.title} 미리보기`} content={draft.content} basePath={project.savePath} onClose={() => setPreviewOpen(false)} />}{pendingDelete && <DeleteConfirmModal title={`${entryLabel} 삭제`} target={pendingDelete.title || `제목 없는 ${entryLabel}`} busy={deleting} onClose={() => setPendingDelete(null)} onConfirm={deletePrompt} />}</>;

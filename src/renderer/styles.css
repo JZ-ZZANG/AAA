@@ -1565,6 +1565,14 @@ input:focus, textarea:focus, select:focus {
    min-height: 0;
 }
 
+.prompt-workspace.sidebar-collapsed {
+   grid-template-columns: minmax(0, 1fr);
+}
+
+.prompt-workspace.sidebar-collapsed .prompt-sidebar {
+   display: none;
+}
+
 .prompt-sidebar, .prompt-editor {
    min-width: 0;
    overflow: hidden;
@@ -5413,6 +5421,16 @@ input:focus, textarea:focus, select:focus {
    padding: 0;
    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
    transform: translateY(-50%);
+}
+
+.censorship-sidebar-toggle::after {
+   top: 50%;
+   left: calc(100% + 7px);
+   transform: translate(0, -50%);
+}
+
+.censorship-sidebar-toggle:hover::after {
+   transform: translate(0, -50%);
 }
 
 .censor-editor.embedded {
