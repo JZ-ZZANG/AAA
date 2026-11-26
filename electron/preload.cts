@@ -60,6 +60,8 @@ contextBridge.exposeInMainWorld("aaa", {
     chooseArchive: () => ipcRenderer.invoke("projects:choose-archive"),
     restore: (input) => ipcRenderer.invoke("projects:restore", input),
     export: (id) => ipcRenderer.invoke("projects:export", id),
+    charxOptions: (id) => ipcRenderer.invoke("projects:charx-options", id),
+    exportCharx: (input) => ipcRenderer.invoke("projects:export-charx", input),
     save: (input) => ipcRenderer.invoke("projects:save", input),
     delete: (id) => ipcRenderer.invoke("projects:delete", id)
   },

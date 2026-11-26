@@ -1321,6 +1321,30 @@ input:focus, textarea:focus, select:focus {
 .export-item-action.icon-button { width: 40px; min-width: 40px; padding: 0; }
 .export-item-action.editor-icon-button { width: 40px; min-width: 40px; height: 40px; }
 .export-status { margin: 0 2px; overflow-wrap: anywhere; }
+.charx-export-modal { display: flex; flex-direction: column; width: min(760px, calc(100vw - 48px)); max-height: calc(100vh - 72px); }
+.charx-export-modal > .modal-heading, .charx-export-modal > .modal-actions { flex-shrink: 0; }
+.charx-export-fields { display: grid; gap: 20px; min-width: 0; min-height: 0; margin: 0; padding: 4px 2px 18px; overflow-y: auto; border: 0; }
+.charx-metadata-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; }
+.charx-content-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.charx-export-fields label:not(.checkbox-field) { display: grid; min-width: 0; gap: 7px; }
+.charx-export-fields input:not([type="checkbox"]), .charx-export-fields select { width: 100%; min-width: 0; }
+.charx-prompt-selection > p, .charx-export-fields small { color: var(--text-muted); font-size: var(--font-meta); }
+.charx-prompt-selection > p { margin: 6px 0 10px; }
+.charx-prompt-list { max-height: 230px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-md); }
+.charx-prompt-list > p { padding: 0 12px; color: var(--text-muted); }
+.charx-prompt-row { display: flex; align-items: center; gap: 12px; min-height: 45px; padding: 7px 12px; }
+.charx-prompt-row + .charx-prompt-row { border-top: 1px solid var(--border); }
+.charx-prompt-row > label:not(.checkbox-field) { display: flex; flex: 1; align-items: center; gap: 9px; overflow-wrap: anywhere; }
+.charx-prompt-row input[type="checkbox"] { flex-shrink: 0; width: 17px; height: 17px; accent-color: var(--accent); }
+.charx-prompt-row small { margin-right: 6px; }
+.charx-prompt-row > div { display: flex; flex-shrink: 0; gap: 5px; }
+.charx-prompt-row .icon-button { width: 28px; min-width: 28px; height: 28px; padding: 0; }
+.charx-export-options { display: grid; gap: 12px; }
+.charx-export-options > label:not(.checkbox-field) { max-width: 360px; }
+.charx-export-error { margin: 0 0 12px; overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .charx-metadata-grid, .charx-content-grid { grid-template-columns: minmax(0, 1fr); }
+}
 .platform-empty-state { display: grid; grid-column: 1 / -1; width: 100%; min-height: 190px; place-items: center; align-content: center; gap: 7px; color: var(--text-muted); text-align: center; }
 .platform-empty-state strong { color: var(--text-main); }
 .platform-shortcut-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
@@ -2564,7 +2588,7 @@ input:focus, textarea:focus, select:focus {
 
 .tag-card {
    display: grid;
-   grid-template-columns: minmax(230px, .7fr) minmax(320px, 1.3fr) 34px;
+   grid-template-columns: minmax(0, 1fr) 34px;
    gap: 12px;
    align-items: start;
    padding: 15px;
@@ -2574,11 +2598,21 @@ input:focus, textarea:focus, select:focus {
 }
 
 .tag-card .tag-name {
+   min-width: 0;
    height: 48px;
 }
 
 .tag-card textarea {
+   grid-column: 1 / -1;
+   grid-row: 2;
+   min-width: 0;
    min-height: 120px;
+}
+
+.tag-card > .remove-button {
+   grid-column: 2;
+   grid-row: 1;
+   align-self: center;
 }
 
 .remove-button {
@@ -2713,7 +2747,7 @@ input:focus, textarea:focus, select:focus {
 }
 
 .model-target-presets {
-   margin-top: 7px;
+   margin-top: 12px;
 }
 
 .model-target-presets button:disabled.active {
@@ -2842,23 +2876,31 @@ input:focus, textarea:focus, select:focus {
    min-width: 0;
 }
 
-.classification-view-modal {
-   width: min(480px, calc(100vw - 48px));
+.asset-settings-modal {
+   width: min(1120px, 100%);
 }
 
-.classification-view-modal .modal-heading {
-   align-items: flex-start;
+.asset-settings-modal .settings-layout > *,
+.asset-settings-modal .settings-column > *,
+.asset-settings-modal .settings-side-column > * {
+   min-width: 0;
 }
 
-.classification-view-modal .modal-heading > div {
+.asset-settings-modal .token-list button,
+.asset-settings-modal .classification-area-meta strong,
+.asset-settings-modal .error {
+   max-width: 100%;
+   overflow-wrap: anywhere;
+}
+
+.asset-location-settings {
    display: grid;
-   gap: 6px;
+   gap: 18px;
 }
 
-.classification-view-modal .modal-heading p {
+.asset-location-settings > label {
+   min-width: 0;
    margin: 0;
-   color: var(--text-muted);
-   font-size: var(--font-meta);
 }
 
 .classification-area-options {
@@ -4818,7 +4860,7 @@ input:focus, textarea:focus, select:focus {
 }
 
 .global-censorship-fields .target-options {
-   margin-top: 0;
+   margin-top: 12px;
 }
 
 .censorship-target-field,

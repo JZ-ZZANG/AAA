@@ -184,7 +184,7 @@ class Store {
     return Number(result.changes) > 0;
   }
 
-  createProject({ name, savePath, censorshipConfig = {} }) {
+  createProject({ name, savePath = "", censorshipConfig = {} }) {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
     this.db.prepare("INSERT INTO projects (id, name, save_path, created_at, updated_at) VALUES (?, ?, ?, ?, ?)")
@@ -563,18 +563,29 @@ class Store {
   }
 
   getWork(projectId) {
+    const projectName = this.db.prepare("SELECT name FROM projects WHERE id = ?").get(projectId)?.name || "";
     const row = this.db.prepare("SELECT introduction, character_preference AS characterPreference, age_rating AS ageRating, tags, updated_at AS updatedAt FROM works WHERE project_id = ?").get(projectId);
     let tags = [];
     try { tags = JSON.parse(row?.tags || "[]"); } catch {}
-    return { projectId, introduction: row?.introduction || "", characterPreference: row?.characterPreference || "ALL", ageRating: row?.ageRating || "SAFE", tags: Array.isArray(tags) ? tags : [], updatedAt: row?.updatedAt || "" };
+    return { projectId, projectName, introduction: row?.introduction || "", characterPreference: row?.characterPreference || "ALL", ageRating: row?.ageRating || "SAFE", tags: Array.isArray(tags) ? tags : [], updatedAt: row?.updatedAt || "" };
   }
 
-  saveWork(projectId, introduction, tags, characterPreference = "ALL", ageRating = "SAFE") {
+  saveWork(projectId, introduction, tags, characterPreference = "ALL", ageRating = "SAFE", projectName?: string) {
     const current = this.getWork(projectId);
-    if (current.updatedAt && current.introduction === introduction && current.characterPreference === characterPreference && current.ageRating === ageRating && JSON.stringify(current.tags) === JSON.stringify(tags)) return current;
+    if (projectName !== undefined && !projectName.trim()) throw new Error("프로젝트 이름을 입력해 주세요.");
+    const nextName = projectName === undefined ? current.projectName : projectName.trim();
+    if (current.updatedAt && current.projectName === nextName && current.introduction === introduction && current.characterPreference === characterPreference && current.ageRating === ageRating && JSON.stringify(current.tags) === JSON.stringify(tags)) return current;
     const now = new Date().toISOString();
-    this.db.prepare(`INSERT INTO works (project_id, introduction, character_preference, age_rating, tags, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(project_id) DO UPDATE SET introduction = excluded.introduction, character_preference = excluded.character_preference, age_rating = excluded.age_rating, tags = excluded.tags, updated_at = excluded.updated_at`).run(projectId, introduction, characterPreference, ageRating, JSON.stringify(tags), now);
-    this.touchProject(projectId, now);
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      this.db.prepare(`INSERT INTO works (project_id, introduction, character_preference, age_rating, tags, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(project_id) DO UPDATE SET introduction = excluded.introduction, character_preference = excluded.character_preference, age_rating = excluded.age_rating, tags = excluded.tags, updated_at = excluded.updated_at`).run(projectId, introduction, characterPreference, ageRating, JSON.stringify(tags), now);
+      if (projectName !== undefined) this.db.prepare("UPDATE projects SET name = ? WHERE id = ?").run(nextName, projectId);
+      this.touchProject(projectId, now);
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
     return this.getWork(projectId);
   }
 

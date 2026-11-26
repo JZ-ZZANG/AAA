@@ -10,6 +10,7 @@ const { inspectAiModel, runAiCensorship } = require("./ai-censorship.cjs");
 const { withStagedFileDeletion } = require("./safe-delete.cjs");
 const { originAssetRoot, cleanedAssetRoot } = require("./project-paths.cjs");
 const { createZip, readArchive, safeArchiveName } = require("./project-archive.cjs");
+const { buildCharxEntries, charxSelection } = require("./charx.cjs");
 const { addStickers, deleteSticker, listStickers, stickerPath } = require("./stickers.cjs");
 const { AiRuntimeManager } = require("./ai-runtime.cjs");
 const { validatedImage, standaloneAssetsFromFiles, scanStandaloneFolder, planStandaloneOutputs } = require("./standalone-ai-censorship.cjs");
@@ -269,7 +270,7 @@ function findPathRuleCollision(tags, pathTemplate) {
 function validateProjectConfig(input) {
   const id = requiredText(input?.id, "프로젝트 ID");
   const name = requiredText(input?.name, "프로젝트 이름");
-  const savePath = path.resolve(requiredText(input?.savePath, "저장 위치"));
+  const savePath = typeof input?.savePath === "string" && input.savePath.trim() ? path.resolve(input.savePath.trim()) : "";
   if (!Array.isArray(input?.tags)) throw new Error("분류 기준 형식이 올바르지 않습니다.");
   const names = new Set();
   const tags = input.tags.map((tag) => {
@@ -304,7 +305,7 @@ function validateProjectConfig(input) {
     if (collision) throw new Error(`에셋 저장 규칙에서 서로 다른 조합이 같은 경로를 만듭니다: ${collision.path} (${collision.first.join(", ")} / ${collision.second.join(", ")})`);
   }
   const censorshipConfig = input?.censorshipConfig && typeof input.censorshipConfig === "object" ? input.censorshipConfig : {};
-  censorshipConfig.enabled = censorshipConfig.enabled === true;
+  censorshipConfig.enabled = Boolean(savePath) && censorshipConfig.enabled === true;
   delete censorshipConfig.outputPath;
   return { id, name, savePath, tags, pathTemplate, externalTracking, censorshipConfig };
 }
@@ -825,26 +826,63 @@ function registerIpc() {
     await fs.promises.writeFile(outputPath, await buildProjectArchive(project));
     return outputPath;
   });
+  ipcMain.handle("projects:charx-options", (_event, projectId) => {
+    const id = requiredText(projectId, "프로젝트 ID");
+    const project = store.getProject(id);
+    if (!project) throw new Error("프로젝트를 찾을 수 없습니다.");
+    return {
+      name: project.name,
+      prompts: store.listPrompts(id).map(({ id, title, folderName }) => ({ id, title, folderName })),
+      situations: store.listSituations(id).map(({ id, title, folderName }) => ({ id, title, folderName })),
+      titleImages: store.listWorkTitleImages(id).filter((image) => image.savedPath).map(({ id, sourceName, position }) => ({ id, sourceName, position })),
+      lorebookCount: store.listLorebooks(id).length,
+      assetCount: store.listAssets(id).length
+    };
+  });
+  ipcMain.handle("projects:export-charx", async (event, input) => {
+    const id = requiredText(input?.projectId, "프로젝트 ID");
+    const project = store.getProject(id);
+    if (!project) throw new Error("프로젝트를 찾을 수 없습니다.");
+    const source = {
+      project,
+      work: store.getWork(id),
+      prompts: store.listPrompts(id).map((entry) => store.getPrompt(entry.id)),
+      situations: store.listSituations(id).map((entry) => store.getSituation(entry.id)),
+      lorebooks: store.listLorebooks(id),
+      titleImages: store.listWorkTitleImages(id),
+      assets: store.listAssets(id)
+    };
+    const selection = charxSelection(source, input);
+    const filename = selection.name.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_").replace(/[. ]+$/, "") || "character";
+    const owner = BrowserWindow.fromWebContents(event.sender);
+    const result = await dialog.showSaveDialog(owner, { defaultPath: `${filename}.charx`, filters: [{ name: "CHARX 캐릭터 카드", extensions: ["charx"] }] });
+    if (result.canceled || !result.filePath) return null;
+    const outputPath = path.extname(result.filePath).toLowerCase() === ".charx" ? result.filePath : `${result.filePath}.charx`;
+    const entries = await buildCharxEntries(source, input);
+    await fs.promises.writeFile(outputPath, createZip(entries));
+    return outputPath;
+  });
   ipcMain.handle("projects:create", async (_event, input) => {
     const name = projectFolderName(input?.name);
-    const parentPath = path.resolve(requiredText(input?.savePath, "저장 위치"));
-    const savePath = path.join(parentPath, name);
-    const existing = await statsOrNull(savePath);
-    if (existing && (!existing.isDirectory() || (await fs.promises.readdir(savePath)).length)) throw new Error("같은 이름의 비어 있지 않은 폴더가 이미 있습니다.");
+    const selectedPath = typeof input?.savePath === "string" ? input.savePath.trim() : "";
+    const savePath = selectedPath ? path.resolve(selectedPath) : "";
+    if (savePath) {
+      const existing = await statsOrNull(savePath);
+      if (existing && !existing.isDirectory()) throw new Error("에셋 위치로 사용할 폴더를 선택해 주세요.");
+    }
     const censorshipConfig = {
-      enabled: input?.censorshipEnabled === true,
+      enabled: Boolean(savePath) && input?.censorshipEnabled === true,
       outputPath: "",
       outputExtension: PROJECT_EXTENSIONS.has(input?.censorshipExtension) ? input.censorshipExtension : ".png"
     };
-    await fs.promises.mkdir(savePath, { recursive: true });
-    await fs.promises.mkdir(originAssetRoot({ savePath }), { recursive: true });
+    if (savePath) await fs.promises.mkdir(originAssetRoot({ savePath }), { recursive: true });
     if (censorshipConfig.enabled) await fs.promises.mkdir(cleanedAssetRoot({ savePath }), { recursive: true });
     return store.createProject({ name, savePath, censorshipConfig });
   });
   ipcMain.handle("projects:delete", (_event, id) => store.deleteProject(requiredText(id, "프로젝트 ID")));
   ipcMain.handle("projects:save", async (_event, input) => {
     const validated = validateProjectConfig(input);
-    await fs.promises.mkdir(originAssetRoot(validated), { recursive: true });
+    if (validated.savePath) await fs.promises.mkdir(originAssetRoot(validated), { recursive: true });
     if (validated.censorshipConfig.enabled) await fs.promises.mkdir(cleanedAssetRoot(validated), { recursive: true });
     const project = store.saveProject(validated);
     return store.getProject(project.id);
@@ -999,7 +1037,8 @@ function registerIpc() {
     const tags = Array.isArray(input?.tags) ? [...new Set(input.tags.filter((tag) => typeof tag === "string").map((tag) => tag.trim()).filter(Boolean))] : [];
     const characterPreference = ["ALL", "MALE", "FEMALE"].includes(input?.characterPreference) ? input.characterPreference : "ALL";
     const ageRating = ["SAFE", "UNSAFE"].includes(input?.ageRating) ? input.ageRating : "SAFE";
-    return store.saveWork(projectId, introduction, tags, characterPreference, ageRating);
+    const projectName = input?.projectName === undefined ? undefined : requiredText(input.projectName, "프로젝트 이름");
+    return store.saveWork(projectId, introduction, tags, characterPreference, ageRating, projectName);
   });
   ipcMain.handle("works:list-images", (_event, projectId) => store.listWorkTitleImages(requiredText(projectId, "프로젝트 ID")));
   ipcMain.handle("works:create-slot", (_event, projectIdValue) => {
@@ -1021,7 +1060,9 @@ function registerIpc() {
     catch (error) { if (error.code === "ENOENT") throw new Error("지원하는 이미지 파일을 선택해 주세요."); throw error; }
     if (!sourceStats.isFile() || !IMAGE_EXTENSIONS.has(path.extname(sourcePath).toLowerCase())) throw new Error("지원하는 이미지 파일을 선택해 주세요.");
     const fileName = `Title${String(Number(slot.position) + 1).padStart(3, "0")}${path.extname(sourcePath).toLowerCase()}`;
-    const destination = path.join(project.savePath, fileName);
+    const titleRoot = project.savePath || path.join(app.getPath("userData"), "projects", project.id, "title_images");
+    await fs.promises.mkdir(titleRoot, { recursive: true });
+    const destination = path.join(titleRoot, fileName);
     try { await fs.promises.copyFile(sourcePath, destination, fs.constants.COPYFILE_EXCL); }
     catch (error) { if (error.code === "EEXIST") throw new Error(`${fileName} 파일이 이미 있습니다.`); throw error; }
     if (!store.setWorkTitleSlotImage(slotId, projectId, fileName, destination)) {

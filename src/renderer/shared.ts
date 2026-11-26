@@ -3,7 +3,6 @@ const ORIGINAL_EXTENSION = "original";
 const TRACKED_EXTENSIONS = [...EXTENSIONS, ".bmp"];
 const DEFAULT_SHORTCUTS = {
   home: "F1",
-  management: "F2",
   work: "F3",
   prompts: "F4",
   lorebook: "F5",

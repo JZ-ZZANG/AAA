@@ -248,7 +248,7 @@ function AppSettings({ preferences, onChange, onBack, updateState, onCheckUpdate
     onChange({ ...preferences, [scope]: next });
   };
 
-  const tabShortcuts = [["home", "홈"], ["management", "관리"], ["work", "작품"], ["prompts", "프롬프트"], ["lorebook", "로어북"], ["situation", "시작 상황"], ["classification", "에셋 분류"], ["censorship", "에셋 검열"], ["export", "내보내기"], ["settings", "설정"]];
+  const tabShortcuts = [["home", "홈"], ["work", "작품"], ["prompts", "프롬프트"], ["lorebook", "로어북"], ["situation", "시작 상황"], ["classification", "에셋 분류"], ["censorship", "에셋 검열"], ["export", "내보내기"], ["settings", "설정"]];
   const censorShortcuts = [["previous", "이전 이미지"], ["next", "다음 이미지"], ["manualToggle", "수동 확인 / 대기"], ["originalPreview", "원본 보기 (홀드)"], ["brushEraserToggle", "브러시 / 지우개"], ["methodCycle", "단색 / 블러 / 모자이크"], ["shapeToggle", "원형 / 사각형"], ["sidebarToggle", "사이드바 열기 / 닫기"], ["undo", "작업 취소"], ["redo", "다시 실행"], ["brushIncrease", "브러시 크기 증가"], ["brushDecrease", "브러시 크기 감소"], ["hardnessIncrease", "경도 증가"], ["hardnessDecrease", "경도 감소"], ["opacityIncrease", "불투명도 증가"], ["opacityDecrease", "불투명도 감소"], ["zoomIncrease", "화면 확대"], ["zoomDecrease", "화면 축소"]];
 
   return <div className="modal-backdrop settings-modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onBack()}>

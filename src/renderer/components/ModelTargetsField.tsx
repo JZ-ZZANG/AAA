@@ -48,10 +48,10 @@ function ModelTargetsField({ modelPath = "", targets = [], onChange, disabled = 
     setError("");
   };
 
-  const addPresetTarget = (target) => {
+  const togglePresetTarget = (target) => {
     const currentTargets = parseCensorTargets(text);
-    if (currentTargets.some((item) => item.toLowerCase() === target.toLowerCase())) return;
-    const nextTargets = [...currentTargets, target];
+    const added = currentTargets.some((item) => item.toLowerCase() === target.toLowerCase());
+    const nextTargets = added ? currentTargets.filter((item) => item.toLowerCase() !== target.toLowerCase()) : [...currentTargets, target];
     setText(formatCensorTargets(nextTargets));
     onChange(nextTargets);
     setError("");
@@ -73,10 +73,10 @@ function ModelTargetsField({ modelPath = "", targets = [], onChange, disabled = 
           {loading ? "불러오는 중…" : "모델 클래스 불러오기"}
         </button>
       </div>
-      <div className="target-options model-target-presets" aria-label="기본 검열 대상 빠른 추가">
+      <div className="target-options model-target-presets" aria-label="기본 검열 대상 선택">
         {CENSOR_TARGET_OPTIONS.map(([value, label]) => {
           const added = parseCensorTargets(text).some((target) => target.toLowerCase() === value.toLowerCase());
-          return <button type="button" className={added ? "active" : ""} disabled={disabled || added} aria-label={`${label} (${value}) 추가`} key={value} onClick={() => addPresetTarget(value)}>{label}</button>;
+          return <button type="button" className={added ? "active" : ""} disabled={disabled} aria-pressed={added} aria-label={`${label} (${value})`} key={value} onClick={() => togglePresetTarget(value)}>{label}</button>;
         })}
       </div>
       <small>여러 대상은 쉼표로 구분합니다.</small>

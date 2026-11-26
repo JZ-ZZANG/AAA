@@ -50,7 +50,7 @@ function Progress({ project, refreshVersion }) {
 
   if (loading) return <div className="empty-state">불러오는 중</div>;
   if (error) return <div className="empty-state">{error}</div>;
-  if (!progress) return <div className="empty-state">관리에서 에셋 분류 기준과 에셋 저장 규칙을 추가하세요.</div>;
+  if (!progress) return <div className="empty-state">설정에서 에셋 분류 기준과 에셋 저장 규칙을 추가하세요.</div>;
   const percentage = progress.overallTotal ? Math.round(progress.complete / progress.overallTotal * 100) : 0;
   const classificationPercentage = progress.total ? Math.round(progress.classified / progress.total * 100) : 0;
   const censorshipPercentage = progress.total ? Math.round(progress.censored / progress.total * 100) : 0;

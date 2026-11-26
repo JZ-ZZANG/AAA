@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { LayoutGrid, RectangleHorizontal, RectangleVertical, Settings as SettingsIcon, Square, Trash2, X } from "lucide-react";
 import { classificationTagAreas, combinations, renderPath, withoutExtension } from "../shared";
 import { DeleteConfirmModal } from "../components/Shell";
+import { AssetSettings } from "./AssetSettings";
 
-function Classification({ project, refreshVersion, layout, onLayoutChange }) {
+function Classification({ project, refreshVersion, layout, onLayoutChange, onSaved }) {
   const ruleTags = project.tags.filter((tag) => project.pathTemplate.includes(`{tag:${tag.id}}`));
   const { sidebarTagIds, cardTagIds, topbarTagIds } = classificationTagAreas(ruleTags, layout);
   const sidebarTags = ruleTags.filter((tag) => sidebarTagIds.includes(tag.id));
@@ -43,15 +44,11 @@ function Classification({ project, refreshVersion, layout, onLayoutChange }) {
     onLayoutChange({ ...layout, ratio: next });
   }
 
-  function setTagArea(tagId, area) {
-    const nextSidebarTagIds = sidebarTagIds.filter((id) => id !== tagId);
-    const nextTopbarTagIds = topbarTagIds.filter((id) => id !== tagId);
-    if (area === "sidebar") nextSidebarTagIds.push(tagId);
-    if (area === "topbar") nextTopbarTagIds.push(tagId);
-    onLayoutChange({ ...layout, sidebarTagIds: nextSidebarTagIds, topbarTagIds: nextTopbarTagIds });
-  }
+  useEffect(() => { window.aaa.assets.list(project.id).then(setAssets).catch((error) => setStatus(error.message)); }, [project.id, project.updatedAt, refreshVersion]);
 
-  useEffect(() => { window.aaa.assets.list(project.id).then(setAssets).catch((error) => setStatus(error.message)); }, [project.id, refreshVersion]);
+  useEffect(() => {
+    setSelections((current) => Object.fromEntries(project.tags.map((tag) => [tag.id, tag.values.some((value) => value.id === current[tag.id]) ? current[tag.id] : tag.values[0]?.id || ""])));
+  }, [project.tags]);
 
   async function classifyFile(file, card, cardKey, overwrite = false) {
     setSavingCard(cardKey);
@@ -85,13 +82,12 @@ function Classification({ project, refreshVersion, layout, onLayoutChange }) {
     return assets.find((asset) => withoutExtension(asset.relativePath) === expected);
   }
 
-  if (!project.tags.length || !project.pathTemplate) return <div className="empty-state">관리에서 에셋 분류 기준과 에셋 저장 규칙을 추가하세요.</div>;
   return <><div className="asset-board with-sidebar" style={{ "--board-columns": layout.columns, "--asset-ratio": layout.ratio === "portrait" ? "832 / 1216" : layout.ratio === "landscape" ? "1216 / 832" : "1 / 1" } as React.CSSProperties}>
-    <aside className="board-sidebar"><div className="sidebar-layout-controls"><button aria-label={`${layout.columns}단`} data-tooltip={`${layout.columns}단`} onClick={cycleColumns}><LayoutGrid size={17} /><span>{layout.columns}</span></button><button aria-label={ratioLabels[layout.ratio]} data-tooltip={ratioLabels[layout.ratio]} onClick={cycleRatio}>{layout.ratio === "landscape" ? <RectangleHorizontal size={19} /> : layout.ratio === "portrait" ? <RectangleVertical size={19} /> : <Square size={17} />}</button><button aria-label="분류 영역 설정" data-tooltip="영역 설정" disabled={!ruleTags.length} onClick={() => setViewSettingsOpen(true)}><SettingsIcon size={17} /></button></div>{sidebarTags.length > 0 && <div className="sidebar-option-list"><strong>{sidebarTags.map((tag) => tag.name).join(" · ")}</strong>{sidebarOptions.map((option) => { const active = Object.entries(option.selections).every(([tagId, valueId]) => selections[tagId] === valueId); return <button className={active ? "active" : ""} key={Object.values(option.selections).join(":")} onClick={() => setSelections({ ...selections, ...option.selections })}><SelectionCaption tags={sidebarTags} selections={option.selections} /></button>; })}</div>}</aside>
+    <aside className="board-sidebar"><div className="sidebar-layout-controls"><button aria-label={`${layout.columns}단`} data-tooltip={`${layout.columns}단`} onClick={cycleColumns}><LayoutGrid size={17} /><span>{layout.columns}</span></button><button aria-label={ratioLabels[layout.ratio]} data-tooltip={ratioLabels[layout.ratio]} onClick={cycleRatio}>{layout.ratio === "landscape" ? <RectangleHorizontal size={19} /> : layout.ratio === "portrait" ? <RectangleVertical size={19} /> : <Square size={17} />}</button><button aria-label="설정" data-tooltip="설정" onClick={() => setViewSettingsOpen(true)}><SettingsIcon size={17} /></button></div>{sidebarTags.length > 0 && <div className="sidebar-option-list"><strong>{sidebarTags.map((tag) => tag.name).join(" · ")}</strong>{sidebarOptions.map((option) => { const active = Object.entries(option.selections).every(([tagId, valueId]) => selections[tagId] === valueId); return <button className={active ? "active" : ""} key={Object.values(option.selections).join(":")} onClick={() => setSelections({ ...selections, ...option.selections })}><SelectionCaption tags={sidebarTags} selections={option.selections} /></button>; })}</div>}</aside>
     <section className="board-content">
       {topbarTags.length > 0 && <div className="board-filters">{topbarTags.map((tag) => <div className="filter-group" key={tag.id}><strong>{tag.name}</strong><div>{tag.values.map((value) => <button className={selections[tag.id] === value.id ? "active" : ""} key={value.id} onClick={() => setSelections({ ...selections, [tag.id]: value.id })}><ValueCaption value={value} /></button>)}</div></div>)}</div>}
       {status && <p className="board-status">{status}</p>}
-      <div className="board-grid">{cards.map((card, index) => {
+      {!project.savePath || !project.tags.length || !project.pathTemplate ? <div className="empty-state">저장위치와 규칙을 설정해 주세요</div> : <div className="board-grid">{cards.map((card, index) => {
         const cardKey = Object.values(card.selections).join(":") || String(index);
         const existing = cardAsset(card);
         const expectedPath = renderPath(project, { ...selections, ...card.selections });
@@ -107,9 +103,9 @@ function Classification({ project, refreshVersion, layout, onLayoutChange }) {
           <div className="card-info"><strong>{card.labels.join(" · ") || "이미지"}</strong><small>{displayedName}</small>{existing && <button className="asset-delete-button" aria-label={`${displayedName} 삭제`} title="이미지 삭제" onClick={() => setDeleteTarget(existing)}><Trash2 size={15} /></button>}</div>
           {existing && <span className="registered">등록됨</span>}
         </article>;
-      })}</div>
+      })}</div>}
     </section>
-  </div>{viewSettingsOpen && <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setViewSettingsOpen(false)}><section className="modal classification-view-modal"><div className="modal-heading"><div><h2>분류 영역 설정</h2><p>저장 규칙에 포함된 각 기준을 표시할 영역을 선택하세요.</p></div><button className="modal-close icon-button" aria-label="닫기" onClick={() => setViewSettingsOpen(false)}><X size={18} /></button></div><div className="classification-area-options">{ruleTags.map((tag) => { const area = sidebarTagIds.includes(tag.id) ? "sidebar" : topbarTagIds.includes(tag.id) ? "topbar" : "card"; return <article className="classification-area-row" key={tag.id}><span className="classification-area-meta"><strong>{tag.name}</strong><small>{tag.values.length}개 값</small></span><div className="classification-area-choices" role="radiogroup" aria-label={`${tag.name} 표시 영역`}>{[["sidebar", "사이드바"], ["topbar", "상단바"], ["card", "카드"]].map(([value, label]) => <button type="button" role="radio" aria-checked={area === value} className={area === value ? "active" : ""} key={value} onClick={() => setTagArea(tag.id, value)}>{label}</button>)}</div></article>; })}</div><div className="classification-view-summary"><span>현재 배치</span><strong>사이드바 {sidebarTags.length} · 상단바 {topbarTags.length} · 카드 {cardTags.length}</strong><small>카드 {cards.length.toLocaleString()}개</small></div><div className="modal-actions"><button className="primary-button" onClick={() => setViewSettingsOpen(false)}>완료</button></div></section></div>}{deleteTarget && <DeleteConfirmModal title="이미지 삭제" target={deleteTarget.relativePath} busy={deleting} onClose={() => setDeleteTarget(null)} onConfirm={deleteAsset} />}</>;
+  </div>{viewSettingsOpen && <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setViewSettingsOpen(false)}><section className="modal asset-settings-modal"><div className="modal-heading"><h2>설정</h2><button className="modal-close icon-button" aria-label="닫기" onClick={() => setViewSettingsOpen(false)}><X size={18} /></button></div><AssetSettings project={project} onSaved={onSaved} layout={layout} onLayoutChange={onLayoutChange} onAssetsChanged={() => window.aaa.assets.list(project.id).then(setAssets)} /></section></div>}{deleteTarget && <DeleteConfirmModal title="이미지 삭제" target={deleteTarget.relativePath} busy={deleting} onClose={() => setDeleteTarget(null)} onConfirm={deleteAsset} />}</>;
 }
 
 export { Classification };

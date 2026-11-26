@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { savedShortcuts, matchesShortcut } from "../shared";
 import { ProjectTitlebarNav } from "../components/Shell";
-import { Settings } from "./Management";
 import { Classification } from "./Classification";
 import { Censorship } from "./Censorship";
 import { Prompts } from "./Prompts";
@@ -10,11 +9,10 @@ import { Work } from "./Work";
 import { ExportProject } from "./Export";
 
 function ProjectPage({ project, onBack, onProjectChanged, classificationLayout, onClassificationLayoutChange, suspended = false }) {
-  const [tab, setTab] = useState("settings");
+  const [tab, setTab] = useState("work");
   useEffect(() => {
     const shortcuts = savedShortcuts();
     const tabShortcuts = [
-      ["management", "settings"],
       ["work", "work"],
       ["prompts", "prompts"],
       ["lorebook", "lorebook"],
@@ -38,9 +36,8 @@ function ProjectPage({ project, onBack, onProjectChanged, classificationLayout, 
     window.addEventListener("keydown", listener);
     return () => window.removeEventListener("keydown", listener);
   }, [project.censorshipConfig.enabled, onBack, suspended]);
-  let content = <Settings project={project} onSaved={onProjectChanged} />;
-  if (tab === "work") content = <Work project={project} />;
-  else if (tab === "classification") content = <Classification project={project} refreshVersion={0} layout={classificationLayout} onLayoutChange={onClassificationLayoutChange} />;
+  let content = <Work project={project} onSaved={onProjectChanged} />;
+  if (tab === "classification") content = <Classification project={project} refreshVersion={0} layout={classificationLayout} onLayoutChange={onClassificationLayoutChange} onSaved={onProjectChanged} />;
   else if (tab === "prompts") content = <Prompts project={project} />;
   else if (tab === "lorebook") content = <Lorebooks project={project} />;
   else if (tab === "situation") content = <Prompts project={project} kind="situation" />;
